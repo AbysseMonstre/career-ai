@@ -1,0 +1,44 @@
+# Career AI — backend container.
+#
+# The backend currently persists to SQLite on a named volume (simple, durable).
+# A Postgres service is included and ready: migrating the data layer to it is the
+# documented next infra step (see README "Vers la production").
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8077:8077"
+    environment:
+      CAREER_AI_ENV: production
+      CAREER_AI_SECRET: ${CAREER_AI_SECRET:?set a strong secret}
+      CAREER_AI_ADMIN_TOKEN: ${CAREER_AI_ADMIN_TOKEN:?set an admin token}
+      CAREER_AI_CORS_ORIGINS: ${CAREER_AI_CORS_ORIGINS:-http://localhost:8090}
+      CAREER_AI_SCHEDULER: ${CAREER_AI_SCHEDULER:-1}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-bancmaha@gmail.com}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      # Adzuna / France Travail activate only when their keys are present
+      ADZUNA_APP_ID: ${ADZUNA_APP_ID:-}
+      ADZUNA_APP_KEY: ${ADZUNA_APP_KEY:-}
+      FT_CLIENT_ID: ${FT_CLIENT_ID:-}
+      FT_CLIENT_SECRET: ${FT_CLIENT_SECRET:-}
+    volumes:
+      - careerai_data:/data
+    restart: unless-stopped
+
+  # Ready for the SQLite -> Postgres migration (next infra step).
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: careerai
+      POSTGRES_USER: careerai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-careerai}
+    volumes:
+      - careerai_pg:/var/lib/postgresql/data
+    profiles: ["postgres"]   # `docker compose --profile postgres up` to enable
+
+volumes:
+  careerai_data:
+  careerai_pg:

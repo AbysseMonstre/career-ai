@@ -1,0 +1,22 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  *{margin:0;padding:0}
+  html,body{width:1024px;height:1024px;overflow:hidden}
+  .icon{width:1024px;height:1024px;position:relative;
+    background:
+      radial-gradient(120% 100% at 30% 10%, #A78BFA 0%, #7C3AED 40%, #4C2C83 72%, #1E1240 100%);
+    display:flex;align-items:center;justify-content:center;}
+  .glow{position:absolute;width:620px;height:620px;border-radius:50%;top:-120px;left:-120px;
+    background:radial-gradient(circle,rgba(34,211,238,.55),transparent 62%);filter:blur(10px);}
+  .glow2{position:absolute;width:520px;height:520px;border-radius:50%;bottom:-160px;right:-120px;
+    background:radial-gradient(circle,rgba(196,181,253,.45),transparent 62%);filter:blur(10px);}
+  .spark{position:relative;font-size:560px;line-height:1;color:#fff;
+    text-shadow:0 14px 60px rgba(0,0,0,.35);font-family:-apple-system,"SF Pro Display",sans-serif;}
+  .ai{position:absolute;bottom:120px;width:100%;text-align:center;color:#fff;
+    font:800 150px -apple-system,"SF Pro Display",sans-serif;letter-spacing:6px;
+    opacity:.96;text-shadow:0 8px 30px rgba(0,0,0,.3)}
+</style></head><body>
+  <div class="icon">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="spark">✦</div>
+  </div>
+</body></html>

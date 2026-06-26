@@ -1,0 +1,34 @@
+name: career_ai
+description: Career AI — connecte chercheurs d'emploi et recruteurs avec matching IA.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  provider: ^6.1.2
+  shared_preferences: ^2.2.2
+  file_picker: ^8.1.6
+  fl_chart: ^0.66.2
+  intl: ^0.19.0
+  url_launcher: ^6.2.5
+
+dev_dependencies:
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+
+flutter_launcher_icons:
+  image_path: "../branding/icon-1024.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+  background_color_hex: "#1E1240"

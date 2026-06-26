@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Career AI — Aura Concept</title>
+<style>
+  :root{
+    --violet:#8B5CF6; --violet-lt:#C4B5FD; --indigo:#6366F1;
+    --ink:#FFFFFF; --muted:#A9A3C2; --muted2:#7E7898;
+    --glass:rgba(255,255,255,.055); --glass-brd:rgba(255,255,255,.10);
+    --green:#34D399; --amber:#FBBF24; --red:#FB7185;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased;
+     font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;}
+  body{background:#9a99ad;background:linear-gradient(160deg,#a3a1b6,#8e8ca6);min-height:100vh;padding:46px 24px 60px;}
+  .head{max-width:760px;margin:0 auto 30px;display:flex;justify-content:space-between;color:#3a3550;font-size:15px;line-height:1.5;}
+  .head .r{text-align:right;}
+  .labels{max-width:760px;margin:0 auto 14px;display:flex;gap:40px;color:#4a4564;font-size:15px;padding-left:40px;}
+  .grid{display:flex;flex-wrap:wrap;gap:40px;justify-content:center;align-items:flex-start;}
+  .col{display:flex;flex-direction:column;gap:14px;align-items:center;}
+  .cap{color:#46415e;font-size:15px;align-self:flex-start;padding-left:8px;}
+
+  /* phone */
+  .phone{width:308px;height:650px;background:#0a0814;border-radius:46px;padding:9px;
+         box-shadow:0 30px 70px rgba(40,20,80,.45), inset 0 0 0 2px #1d1830;}
+  .screen{position:relative;width:100%;height:100%;border-radius:38px;overflow:hidden;
+          background:
+            radial-gradient(120% 70% at 50% -10%, #4c2c83 0%, #2a1850 38%, #150e2b 70%, #0c0820 100%);
+          display:flex;flex-direction:column;}
+  .glow{position:absolute;width:280px;height:280px;border-radius:50%;
+        background:radial-gradient(circle,rgba(139,92,246,.45),transparent 65%);
+        filter:blur(20px);top:-60px;left:-30px;pointer-events:none;}
+  .statusbar{position:relative;z-index:5;display:flex;justify-content:space-between;align-items:center;
+             padding:14px 24px 4px;color:#fff;font-size:13px;font-weight:600;}
+  .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:96px;height:26px;background:#000;border-radius:16px;z-index:10;}
+  .body{position:relative;z-index:2;flex:1;overflow-y:auto;padding:8px 20px 18px;}
+  .body::-webkit-scrollbar{display:none;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:4px 0 6px;color:#fff;}
+  .ava{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#8B5CF6,#22d3ee);}
+  .ico{color:#cabfe6;font-size:18px;}
+
+  .kick{color:var(--violet-lt);font-size:13px;letter-spacing:.5px;text-align:center;margin:10px 0 4px;}
+  .display{color:#fff;font-size:40px;line-height:1.05;font-weight:300;text-align:center;letter-spacing:-1px;margin-bottom:18px;}
+  .display b{font-weight:600;}
+
+  .search{display:flex;align-items:center;gap:10px;background:var(--glass);
+          border:1px solid var(--glass-brd);border-radius:18px;padding:13px 16px;color:var(--muted);font-size:14px;
+          backdrop-filter:blur(14px);}
+  .pills{display:flex;gap:9px;margin:16px 0 6px;overflow:hidden;}
+  .pill{padding:9px 16px;border-radius:22px;font-size:13px;color:var(--muted);
+        background:var(--glass);border:1px solid var(--glass-brd);white-space:nowrap;}
+  .pill.on{background:linear-gradient(120deg,#C4B5FD,#8B5CF6);color:#1b0f37;font-weight:600;border:none;}
+
+  .seg{display:flex;align-items:center;justify-content:space-between;color:#fff;font-size:17px;font-weight:600;margin:20px 0 10px;}
+  .seg .chev{color:var(--muted);font-size:15px;}
+
+  .glass{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;
+         backdrop-filter:blur(16px);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);}
+
+  .stats{display:flex;gap:12px;}
+  .stat{flex:1;padding:16px;position:relative;overflow:hidden;}
+  .stat .t{display:flex;justify-content:space-between;align-items:flex-start;}
+  .stat .tt{color:#fff;font-size:14px;font-weight:600;}
+  .stat .ts{color:var(--muted);font-size:11px;margin-top:1px;}
+  .stat .big{color:#fff;font-size:40px;font-weight:300;margin-top:26px;letter-spacing:-1px;}
+  .stat .unit{font-size:14px;color:var(--muted);font-weight:400;margin-left:3px;}
+  .spark{position:absolute;left:16px;right:16px;top:64px;height:36px;opacity:.9;}
+  .fill{position:absolute;left:0;bottom:0;width:100%;height:74px;
+        background:radial-gradient(90% 80% at 70% 120%,rgba(139,92,246,.55),transparent 70%);}
+
+  /* list row */
+  .rowc{display:flex;align-items:center;gap:14px;padding:14px;margin-top:12px;}
+  .thumb{width:50px;height:50px;border-radius:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+         font-weight:700;font-size:13px;color:#fff;}
+  .rtxt{flex:1;min-width:0;}
+  .rtit{color:#fff;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rsub{color:var(--muted);font-size:12px;margin-top:2px;line-height:1.35;}
+  .chev{color:var(--muted2);font-size:18px;}
+
+  .skl{display:inline-block;padding:4px 10px;border-radius:14px;font-size:10px;margin:6px 4px 0 0;
+       background:rgba(196,181,253,.14);color:var(--violet-lt);border:1px solid rgba(196,181,253,.2);}
+
+  .ring{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        font-weight:700;font-size:14px;color:#fff;flex-shrink:0;}
+
+  .ghost{margin:16px auto 4px;display:block;width:fit-content;color:var(--muted);font-size:13px;
+         padding:10px 22px;border-radius:20px;background:rgba(255,255,255,.04);border:1px solid var(--glass-brd);}
+
+  .cta{display:block;width:100%;text-align:center;padding:15px;border-radius:18px;color:#fff;font-size:15px;font-weight:600;
+       background:linear-gradient(120deg,#7C3AED,#6366F1);box-shadow:0 10px 24px rgba(99,102,241,.4);border:none;}
+
+  /* tabbar */
+  .tabbar{position:relative;z-index:5;display:flex;justify-content:space-around;align-items:center;height:64px;
+          background:rgba(20,12,40,.55);backdrop-filter:blur(20px);border-top:1px solid var(--glass-brd);}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted2);font-size:10px;}
+  .tab .d{font-size:19px;}
+  .tab.on{color:#fff;}
+  .tab.on .d{filter:drop-shadow(0 0 8px rgba(139,92,246,.9));}
+
+  .field{background:var(--glass);border:1px solid var(--glass-brd);border-radius:16px;padding:13px 15px;color:var(--muted);font-size:14px;margin-bottom:11px;backdrop-filter:blur(12px);}
+  .role{flex:1;border-radius:18px;padding:16px;text-align:center;font-size:12px;color:var(--muted);background:var(--glass);border:1px solid var(--glass-brd);}
+  .role.on{border:1.5px solid var(--violet-lt);background:rgba(139,92,246,.18);color:#fff;font-weight:600;}
+  .donut{width:118px;height:118px;border-radius:50%;margin:8px auto;
+         background:conic-gradient(var(--green) 0 33%, var(--amber) 33% 100%);
+         -webkit-mask:radial-gradient(circle 36px at center,transparent 98%,#000 100%);}
+  .legend{display:flex;gap:16px;justify-content:center;color:var(--muted);font-size:11px;}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;}
+  footer{max-width:760px;margin:34px auto 0;color:#3f3a57;text-align:center;font-size:13px;}
+</style>
+</head>
+<body>
+  <div class="head">
+    <div>Web / Mobile App<br>UIX Design</div>
+    <div>2025<br>Glass Concept</div>
+    <div class="r">Career AI<br>Concept</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- 1 · Offres (Discover) -->
+    <div class="col">
+      <div class="cap">1 · Offres</div>
+      <div class="phone"><div class="screen"><div class="glow"></div><div class="notch"></div>
+        <div class="statusbar"><span>14:41</span><span>📶 &nbsp;􀙇 &nbsp;100%</span></div>
+        <div class="body">
+          <div class="topbar"><span class="ico">←</span><div class="ava"></div></div>
+          <div class="kick">✦ &nbsp;Career AI</div>
+          <div class="display">Trouvez votre<br><b>prochain poste</b></div>
+          <div class="search">🔍 &nbsp;Rechercher un métier, une techno…</div>
+          <div class="pills">
+            <span class="pill on">Tout</span><span class="pill">Remote</span>
+            <span class="pill">Tech</span><span class="pill">Design</span>
+          </div>
+
+          <div class="seg">Votre activité <span class="chev">›</span></div>
+          <div class="stats">
+            <div class="glass stat"><div class="fill"></div>
+              <div class="t"><div><div class="tt">Score moyen</div><div class="ts">matching</div></div><span class="chev">›</span></div>
+              <svg class="spark" viewBox="0 0 100 36" preserveAspectRatio="none"><polyline points="0,28 18,22 34,26 52,12 70,18 88,8 100,14" fill="none" stroke="#C4B5FD" stroke-width="2.5" stroke-linecap="round"/></svg>
+              <div class="big">38<span class="unit">%</span></div>
+            </div>
+            <div class="glass stat"><div class="fill"></div>
+              <div class="t"><div><div class="tt">Candidatures</div><div class="ts">en cours</div></div><span class="chev">›</span></div>
+              <div class="big">03</div>
+            </div>
+          </div>
+
+          <div class="seg">Top correspondances <span class="chev">›</span></div>
+          <div class="glass rowc">
+            <div class="thumb" style="background:linear-gradient(135deg,#7C3AED,#22d3ee)">48%</div>
+            <div class="rtxt"><div class="rtit">Senior Backend Developer</div>
+              <div class="rsub">Product Creation · Remote</div></div>
+            <span class="chev">›</span>
+          </div>
+          <div class="glass rowc">
+            <div class="thumb" style="background:linear-gradient(135deg,#6366F1,#8B5CF6)">39%</div>
+            <div class="rtxt"><div class="rtit">Senior Software Engineer</div>
+              <div class="rsub">Globex · Remote</div></div>
+            <span class="chev">›</span>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on"><span class="d">􀛕</span>Offres</div>
+          <div class="tab"><span class="d">✈</span>Candidatures</div>
+          <div class="tab"><span class="d">◷</span>Tableau</div>
+          <div class="tab"><span class="d">􀉭</span>CV</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 · Détail offre / liste -->
+    <div class="col">
+      <div class="cap">2 · Détail & candidature</div>
+      <div class="phone"><div class="screen"><div class="glow"></div><div class="notch"></div>
+        <div class="statusbar"><span>14:41</span><span>📶 &nbsp;􀙇 &nbsp;100%</span></div>
+        <div class="body">
+          <div class="topbar"><span class="ico">←</span><span style="color:#fff;font-weight:600">Détail de l'offre</span><div class="ava"></div></div>
+
+          <div class="glass" style="padding:20px;margin-top:8px;text-align:center">
+            <div class="ring" style="margin:0 auto 12px;width:74px;height:74px;border:5px solid #FBBF24;color:#FBBF24;font-size:20px">48%</div>
+            <div style="color:#fff;font-size:20px;font-weight:600">Senior Backend Developer</div>
+            <div class="rsub" style="font-size:13px">Product Creation · Remote · arbeitnow</div>
+            <div style="margin-top:12px">
+              <span class="skl">python</span><span class="skl">aws</span><span class="skl">docker</span><span class="skl">machine learning</span>
+            </div>
+          </div>
+
+          <div class="seg" style="font-size:15px">Compétences à acquérir</div>
+          <div><span class="skl" style="background:rgba(251,113,133,.14);color:#FB7185;border-color:rgba(251,113,133,.25)">kubernetes</span>
+               <span class="skl" style="background:rgba(251,113,133,.14);color:#FB7185;border-color:rgba(251,113,133,.25)">graphql</span></div>
+
+          <div class="seg" style="font-size:15px">Description</div>
+          <div class="rsub" style="font-size:13px;line-height:1.6">
+            Rejoignez une équipe produit pour concevoir des APIs scalables. Stack Python/FastAPI,
+            déploiement Docker sur AWS, culture agile et fort impact produit…</div>
+          <div style="height:14px"></div>
+          <button class="cta">📨 &nbsp;Postuler automatiquement</button>
+          <div class="ghost">Ajouter à ma sélection</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 · Tableau de bord -->
+    <div class="col">
+      <div class="cap">3 · Tableau chercheur</div>
+      <div class="phone"><div class="screen"><div class="glow"></div><div class="notch"></div>
+        <div class="statusbar"><span>14:41</span><span>📶 &nbsp;􀙇 &nbsp;100%</span></div>
+        <div class="body">
+          <div class="topbar"><span style="color:#fff;font-size:22px;font-weight:600">Tableau de bord</span><span class="ico">⎋</span></div>
+          <div class="stats" style="margin-top:14px">
+            <div class="glass stat"><div class="fill"></div>
+              <div class="tt">Score moyen</div>
+              <div class="big" style="color:#FBBF24">38<span class="unit">%</span></div></div>
+            <div class="glass stat">
+              <div class="tt">Offres dispo</div>
+              <div class="big">66</div></div>
+          </div>
+          <div class="stats" style="margin-top:12px">
+            <div class="glass stat"><div class="tt">Validées</div><div class="big" style="color:#34D399">01</div></div>
+            <div class="glass stat"><div class="tt">En attente</div><div class="big" style="color:#FBBF24">02</div></div>
+          </div>
+
+          <div class="glass" style="padding:18px;margin-top:14px">
+            <div style="color:#fff;font-weight:600;font-size:14px">Répartition des candidatures</div>
+            <div class="donut"></div>
+            <div class="legend"><span><span class="dot" style="background:#34D399"></span>Validées</span>
+              <span><span class="dot" style="background:#FBBF24"></span>En attente</span></div>
+          </div>
+
+          <div class="glass" style="padding:16px;margin-top:12px">
+            <div style="color:#fff;font-weight:600">Data Scientist</div>
+            <div class="rsub">remote</div>
+            <div style="margin-top:10px">
+              <span class="skl">python</span><span class="skl">machine learning</span><span class="skl">tensorflow</span>
+              <span class="skl">pytorch</span><span class="skl">aws</span><span class="skl">sql</span>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="d">􀛕</span>Offres</div>
+          <div class="tab"><span class="d">✈</span>Candidatures</div>
+          <div class="tab on"><span class="d">◷</span>Tableau</div>
+          <div class="tab"><span class="d">􀉭</span>CV</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4 · Talents recruteur -->
+    <div class="col">
+      <div class="cap">4 · Base de talents (recruteur)</div>
+      <div class="phone"><div class="screen"><div class="glow"></div><div class="notch"></div>
+        <div class="statusbar"><span>14:41</span><span>📶 &nbsp;􀙇 &nbsp;100%</span></div>
+        <div class="body">
+          <div class="topbar"><span style="color:#fff;font-size:22px;font-weight:600">Talents</span><div class="ava"></div></div>
+          <div class="rsub" style="margin:-2px 0 12px">Candidats classés par correspondance</div>
+          <div class="search">🔍 &nbsp;machine learning · python · aws</div>
+
+          <div class="glass" style="padding:16px;margin-top:14px">
+            <div class="rowc" style="padding:0;margin:0">
+              <div class="thumb" style="background:linear-gradient(135deg,#8B5CF6,#22d3ee)">S</div>
+              <div class="rtxt"><div class="rtit">Sarah Martin</div><div class="rsub">Data Scientist · remote</div></div>
+              <div class="ring" style="border:5px solid #FBBF24;color:#FBBF24">48%</div>
+            </div>
+            <div style="margin-top:12px">
+              <span class="skl">python</span><span class="skl">machine learning</span><span class="skl">aws</span>
+              <span class="skl" style="background:rgba(255,255,255,.06);color:var(--muted);border-color:var(--glass-brd)">tensorflow</span>
+            </div>
+            <div class="rsub" style="margin-top:10px">✉ sarah@dev.io &nbsp;·&nbsp; <b style="color:var(--violet-lt)">3 skills en commun</b></div>
+          </div>
+
+          <div class="glass" style="padding:16px;margin-top:12px">
+            <div class="rowc" style="padding:0;margin:0">
+              <div class="thumb" style="background:linear-gradient(135deg,#475569,#64748b)">L</div>
+              <div class="rtxt"><div class="rtit">Leo Bernard</div><div class="rsub">Frontend Developer</div></div>
+              <div class="ring" style="border:5px solid #FB7185;color:#FB7185">15%</div>
+            </div>
+            <div style="margin-top:12px">
+              <span class="skl" style="background:rgba(255,255,255,.06);color:var(--muted);border-color:var(--glass-brd)">react</span>
+              <span class="skl" style="background:rgba(255,255,255,.06);color:var(--muted);border-color:var(--glass-brd)">figma</span>
+            </div>
+            <div class="rsub" style="margin-top:10px">✉ leo@dev.io &nbsp;·&nbsp; 0 skill en commun</div>
+          </div>
+          <div class="ghost">Voir plus de profils</div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on"><span class="d">􀉮</span>Talents</div>
+          <div class="tab"><span class="d">􀅼</span>Publier</div>
+          <div class="tab"><span class="d">◷</span>Tableau</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 · Auth -->
+    <div class="col">
+      <div class="cap">5 · Connexion</div>
+      <div class="phone"><div class="screen"><div class="glow"></div><div class="notch"></div>
+        <div class="statusbar"><span>14:41</span><span>📶 &nbsp;􀙇 &nbsp;100%</span></div>
+        <div class="body">
+          <div style="text-align:center;margin-top:30px">
+            <div style="width:64px;height:64px;border-radius:20px;margin:0 auto;
+                 background:linear-gradient(135deg,#8B5CF6,#22d3ee);display:flex;align-items:center;justify-content:center;font-size:30px">✦</div>
+            <div class="display" style="font-size:30px;margin:18px 0 4px">Career <b>AI</b></div>
+            <div class="rsub">Le matching intelligent entre<br>talents et entreprises</div>
+          </div>
+          <div style="color:#fff;font-size:20px;font-weight:600;margin:26px 0 14px">Créer un compte</div>
+          <div style="display:flex;gap:11px;margin-bottom:16px">
+            <div class="role on">🔍<br>Chercheur</div>
+            <div class="role">💼<br>Recruteur</div>
+          </div>
+          <div class="field">👤 &nbsp;Nom complet</div>
+          <div class="field">✉️ &nbsp;Email</div>
+          <div class="field">🔒 &nbsp;Mot de passe</div>
+          <div style="height:8px"></div>
+          <button class="cta">S'inscrire</button>
+          <div style="text-align:center;color:var(--violet-lt);font-size:13px;margin-top:16px">Déjà un compte ? Se connecter</div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+  <footer>Aperçu statique · l'app Flutter (mobile/lib) applique ce même thème glassmorphisme violet. Accent #8B5CF6 · surfaces translucides · fond dégradé aurora.</footer>
+</body>
+</html>
