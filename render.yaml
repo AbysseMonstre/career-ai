@@ -15,9 +15,9 @@ services:
         generateValue: true
       - key: CAREER_AI_ADMIN_TOKEN
         generateValue: true
-      # Set to your deployed frontend URL once it exists (no trailing slash).
+      # Frontend origin (GitHub Pages), no trailing slash.
       - key: CAREER_AI_CORS_ORIGINS
-        value: https://careerai.pages.dev
+        value: https://abyssemonstre.github.io
       - key: CAREER_AI_SCHEDULER
         value: "0"
       - key: ADMIN_EMAIL
