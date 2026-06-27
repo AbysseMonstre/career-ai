@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'services/app_state.dart';
 import 'theme/app_theme.dart';
@@ -8,10 +11,23 @@ import 'screens/onboarding_screen.dart';
 import 'screens/seeker_home.dart';
 import 'screens/recruiter_home.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // On web, read the backend URL from config.json so it can be changed after
+  // deployment (no rebuild). Falls back to the compiled default otherwise.
+  String? apiBase;
+  if (kIsWeb) {
+    try {
+      final r = await http.get(Uri.parse('config.json'));
+      if (r.statusCode == 200) {
+        final u = (jsonDecode(r.body) as Map)['apiBaseUrl'];
+        if (u is String && u.isNotEmpty) apiBase = u;
+      }
+    } catch (_) {/* use default */}
+  }
   runApp(
     ChangeNotifierProvider(
-      create: (_) => AppState()..bootstrap(),
+      create: (_) => AppState(apiBaseUrl: apiBase)..bootstrap(),
       child: const CareerAIApp(),
     ),
   );

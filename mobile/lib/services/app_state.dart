@@ -5,10 +5,12 @@ import '../models/models.dart';
 
 /// Holds auth session and exposes the shared [ApiService].
 class AppState extends ChangeNotifier {
-  final ApiService api = ApiService();
+  final ApiService api;
   AppUser? user;
   bool loading = true;
   bool onboarded = true;
+
+  AppState({String? apiBaseUrl}) : api = ApiService(baseUrl: apiBaseUrl);
 
   bool get isLoggedIn => user != null;
 
