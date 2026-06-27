@@ -248,33 +248,40 @@ class LinkedIn(BaseScraper):
     _LOC = re.compile(r'job-search-card__location[^"]*">\s*(.*?)\s*</span>', re.S)
 
     def fetch(self, query="", location=""):
-        params = {"keywords": query or "developer", "location": location or "", "start": 0}
-        try:
-            html = http_get(
-                "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search",
-                params=params, headers={"Accept": "text/html"}).text
-        except Exception:
-            return []
-        urls = self._CARD.findall(html)
-        titles = self._TITLE.findall(html)
-        companies = self._COMPANY.findall(html)
-        locs = self._LOC.findall(html)
         out = []
-        for i, url in enumerate(urls):
-            m = re.search(r"-(\d+)$", url)
-            ext = m.group(1) if m else str(abs(hash(url)))
-            out.append({
-                "source": self.name,
-                "ext_id": ext,
-                "title": strip_html(titles[i]) if i < len(titles) else "",
-                "company": strip_html(companies[i]) if i < len(companies) else "",
-                "location": strip_html(locs[i]) if i < len(locs) else (location or ""),
-                "url": url,
-                "description": "",
-                "tags": [],
-                "salary": "",
-                "posted_at": "",
-            })
+        seen = set()
+        for start in (0, 25, 50):  # paginate for more volume
+            params = {"keywords": query or "developer", "location": location or "", "start": start}
+            try:
+                html = http_get(
+                    "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search",
+                    params=params, headers={"Accept": "text/html"}).text
+            except Exception:
+                break
+            urls = self._CARD.findall(html)
+            if not urls:
+                break
+            titles = self._TITLE.findall(html)
+            companies = self._COMPANY.findall(html)
+            locs = self._LOC.findall(html)
+            for i, url in enumerate(urls):
+                m = re.search(r"-(\d+)$", url)
+                ext = m.group(1) if m else str(abs(hash(url)))
+                if ext in seen:
+                    continue
+                seen.add(ext)
+                out.append({
+                    "source": self.name,
+                    "ext_id": ext,
+                    "title": strip_html(titles[i]) if i < len(titles) else "",
+                    "company": strip_html(companies[i]) if i < len(companies) else "",
+                    "location": strip_html(locs[i]) if i < len(locs) else (location or ""),
+                    "url": url,
+                    "description": "",
+                    "tags": [],
+                    "salary": "",
+                    "posted_at": "",
+                })
         return out
 
 
@@ -328,7 +335,7 @@ class Apec(BaseScraper):
 
     def fetch(self, query="", location=""):
         body = {"motsCles": query or "", "sorts": [], "typesContrat": [],
-                "pagination": {"startIndex": 0, "range": 50}}
+                "pagination": {"startIndex": 0, "range": 100}}
         try:
             resp = requests.post(
                 "https://www.apec.fr/cms/webservices/rechercheOffre",
