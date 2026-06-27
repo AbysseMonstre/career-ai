@@ -51,6 +51,14 @@ CREATE TABLE IF NOT EXISTS training_sessions (
     created_at  TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Liked / favorite offers (seeker).
+CREATE TABLE IF NOT EXISTS favorites (
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    job_id     INTEGER NOT NULL REFERENCES jobs(id),
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, job_id)
+);
+
 -- Duolingo-style daily activity log (one row per user per day).
 CREATE TABLE IF NOT EXISTS activity (
     user_id     INTEGER NOT NULL REFERENCES users(id),

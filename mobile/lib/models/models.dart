@@ -51,6 +51,7 @@ class Job {
   final List<String> tags;
   final String salary;
   final MatchStats? match;
+  bool liked; // mutable so the heart toggles instantly
 
   Job({
     required this.id,
@@ -63,6 +64,7 @@ class Job {
     required this.tags,
     required this.salary,
     this.match,
+    this.liked = false,
   });
 
   factory Job.fromJson(Map<String, dynamic> j) => Job(
@@ -76,6 +78,7 @@ class Job {
         tags: List<String>.from(j['tags'] ?? []),
         salary: j['salary'] ?? '',
         match: j['match'] != null ? MatchStats.fromJson(j['match']) : null,
+        liked: j['liked'] == true,
       );
 }
 

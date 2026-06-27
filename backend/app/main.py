@@ -21,7 +21,7 @@ from starlette.responses import Response
 from pydantic import BaseModel
 
 from .database import get_conn, init_db
-from . import security, cv_parser, matching, notifications, config, cover_letter
+from . import security, cv_parser, matching, notifications, config, cover_letter, expansion
 from .scrapers import scrape_all
 
 app = FastAPI(title="Career AI", version="1.0")
@@ -347,81 +347,86 @@ def _passes_filters(job: dict, contract: str, remote: bool) -> bool:
 
 @app.get("/jobs")
 def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool = False,
-              sync_profile: bool = False,
+              sync_profile: bool = False, favorites_only: bool = False,
               contract: str = "", remote: bool = False, sort: str = "match",
               max_age_days: int = 0, user: dict = Depends(current_user)):
     """List jobs, ranked by CV match for seekers.
 
-    Filters: query, location, contract (cdi|cdd|freelance|stage|alternance), remote.
-    Only recent offers are returned (within max_age_days; default = retention window).
-    sort: match (default) | recent | salary.
-    sync=true scrapes this query; sync_profile=true scrapes every source for the
-    candidate's title + top CV skills (offers matching the whole CV).
+    The query is expanded (FR<->EN + synonyms) to surface more, more varied offers
+    from the same sources. Filters: location, contract, remote, favorites_only.
     """
     if max_age_days <= 0:
         max_age_days = config.JOB_RETENTION_DAYS
+    is_seeker = user["role"] == "seeker"
+    variants = expansion.expand_query(query) if query else [""]
 
-    if sync_profile and user["role"] == "seeker":
+    if sync_profile and is_seeker:
         with get_conn() as conn:
             prof = _profile(conn, user["id"])
         queries = [q for q in [prof.get("title", "")] if q] + (prof.get("skills") or [])[:6]
         seen = set()
         for q in queries:
-            q = q.strip()
-            if q and q.lower() not in seen:
-                seen.add(q.lower())
-                scrape_all(q, location)
+            for v in expansion.expand_query(q.strip()):
+                if v and v.lower() not in seen:
+                    seen.add(v.lower())
+                    scrape_all(v, location)
     elif sync:
-        scrape_all(query, location)
+        for v in variants:
+            scrape_all(v, location)
 
-    def build(qy, loc):
+    def build():
         sql = "SELECT * FROM jobs WHERE 1=1"
         args = []
-        if qy:
-            # each search word (>=3 chars) must appear somewhere — not the exact phrase
-            for w in [w for w in qy.lower().split() if len(w) >= 3]:
-                sql += " AND (LOWER(title) LIKE ? OR LOWER(description) LIKE ? OR LOWER(tags) LIKE ?)"
-                like = f"%{w}%"
-                args += [like, like, like]
-        if loc:
+        if query:
+            ors = []
+            for v in variants:
+                words = [w for w in v.lower().split() if len(w) >= 3]
+                if not words:
+                    continue
+                conds = []
+                for w in words:
+                    conds.append("(LOWER(title) LIKE ? OR LOWER(description) LIKE ? OR LOWER(tags) LIKE ?)")
+                    like = f"%{w}%"
+                    args += [like, like, like]
+                ors.append("(" + " AND ".join(conds) + ")")
+            if ors:
+                sql += " AND (" + " OR ".join(ors) + ")"
+        if location:
             sql += (" AND (LOWER(location) LIKE ? OR LOWER(location) LIKE '%remote%'"
                     " OR LOWER(location) LIKE '%anywhere%' OR LOWER(location) LIKE '%worldwide%'"
                     " OR LOWER(location) LIKE '%télétravail%')")
-            args.append(f"%{loc.lower()}%")
+            args.append(f"%{location.lower()}%")
         sql += " ORDER BY fetched_at DESC"
         return sql, args
 
     with get_conn() as conn:
-        profile = _profile(conn, user["id"]) if user["role"] == "seeker" else None
-        sql, args = build(query, location)
+        profile = _profile(conn, user["id"]) if is_seeker else None
+        favs = {r["job_id"] for r in conn.execute(
+            "SELECT job_id FROM favorites WHERE user_id=?", (user["id"],)).fetchall()}
+        sql, args = build()
         rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
-
-        # nothing matching cached yet -> scrape this search on the fly, then reload
         if not rows and (query or location):
-            scrape_all(query, location)
-            rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
-        elif not rows:
-            scrape_all(query, location)
-            sql, args = build(query, location)
+            for v in variants:
+                scrape_all(v, location)
             rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
 
-    # only recent offers: drop those older than the window (unknown date kept)
     def _recent(j):
         age = _job_age_days(j)
         return age is None or age <= max_age_days
     rows = [j for j in rows if _recent(j)]
-
-    # advanced filters (contract type / remote-only)
     if contract or remote:
         rows = [j for j in rows if _passes_filters(j, contract, remote)]
+    for j in rows:
+        j["liked"] = j["id"] in favs
+    if favorites_only:
+        rows = [j for j in rows if j["liked"]]
 
     if profile is not None:
         for j in rows:
             j["match"] = matching.score(profile, j)
-
     if sort == "recent":
         rows.sort(key=lambda x: x.get("fetched_at", ""), reverse=True)
-    elif profile is not None:  # default: best match first
+    elif profile is not None:
         rows.sort(key=lambda x: x["match"]["score"], reverse=True)
     return {"count": len(rows[:limit]), "jobs": rows[:limit]}
 
@@ -757,6 +762,24 @@ def market_insights(query: str = "", limit_skills: int = 15, user: dict = Depend
         "salary": salary,
         "by_source": dict(by_source),
     }
+
+
+@app.post("/favorites/{job_id}")
+def toggle_favorite(job_id: int, user: dict = Depends(require_role("seeker"))):
+    """Like/unlike an offer. Returns the new state."""
+    with get_conn() as conn:
+        exists = conn.execute("SELECT 1 FROM favorites WHERE user_id=? AND job_id=?",
+                              (user["id"], job_id)).fetchone()
+        if exists:
+            conn.execute("DELETE FROM favorites WHERE user_id=? AND job_id=?", (user["id"], job_id))
+            liked = False
+        else:
+            conn.execute("INSERT OR IGNORE INTO favorites (user_id, job_id) VALUES (?,?)",
+                         (user["id"], job_id))
+            liked = True
+        count = conn.execute("SELECT COUNT(*) c FROM favorites WHERE user_id=?",
+                            (user["id"],)).fetchone()["c"]
+    return {"liked": liked, "count": count}
 
 
 @app.post("/jobs/post")

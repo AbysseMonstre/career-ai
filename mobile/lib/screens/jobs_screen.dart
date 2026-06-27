@@ -57,7 +57,14 @@ class _JobsScreenState extends State<JobsScreen> {
   bool _loading = false;
   String _contract = ''; // '' | cdi | cdd | freelance | stage | alternance
   bool _remote = false;
+  bool _favoritesOnly = false;
   String _sort = 'match'; // match | recent
+
+  static const _categories = {
+    'Tech': 'développeur', 'Data': 'data', 'Design': 'designer',
+    'Marketing': 'marketing', 'Commercial': 'commercial', 'Finance': 'finance',
+    'RH': 'ressources humaines', 'Santé': 'infirmier', 'Logistique': 'logistique',
+  };
   List<String> _history = []; // "query|location" entries, most recent first
   String _profileTitle = '';
   List<String> _profileSkills = [];
@@ -137,11 +144,26 @@ class _JobsScreenState extends State<JobsScreen> {
       final api = context.read<AppState>().api;
       _jobs = await api.jobs(
           query: _search.text.trim(), location: _location.text.trim(),
-          contract: _contract, remote: _remote, sort: _sort);
+          contract: _contract, remote: _remote, sort: _sort, favoritesOnly: _favoritesOnly);
     } catch (e) {
       if (mounted) showError(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _runCategory(String query) {
+    _search.text = query;
+    _searchAndSync();
+  }
+
+  Future<void> _toggleLike(Job job) async {
+    HapticFeedback.selectionClick();
+    try {
+      final liked = await context.read<AppState>().api.toggleFavorite(job.id);
+      setState(() => job.liked = liked);
+    } catch (e) {
+      if (mounted) showError(context, e);
     }
   }
 
@@ -162,7 +184,7 @@ class _JobsScreenState extends State<JobsScreen> {
       final api = context.read<AppState>().api;
       _jobs = await api.jobs(
           query: q, location: loc, sync: true,
-          contract: _contract, remote: _remote, sort: _sort);
+          contract: _contract, remote: _remote, sort: _sort, favoritesOnly: _favoritesOnly);
       if (mounted) {
         showOk(context, '${_jobs.length} offres synchronisées${loc.isEmpty ? '' : ' · $loc'}');
       }
@@ -190,14 +212,38 @@ class _JobsScreenState extends State<JobsScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Offres pour vous',
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            const Text('Offres pour vous',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            IconButton.filledTonal(
+              onPressed: _loading ? null : _searchAndSync,
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Rafraîchir (chercher de nouvelles offres)',
+            ),
+          ]),
+        ),
+        // categories
+        SizedBox(
+          height: 36,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: _categories.entries
+                .map((e) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ActionChip(
+                        label: Text(e.key, style: const TextStyle(fontSize: 13)),
+                        backgroundColor: AppTheme.glass(),
+                        side: BorderSide(color: AppTheme.glassBorder()),
+                        onPressed: () => _runCategory(e.value),
+                      ),
+                    ))
+                .toList(),
           ),
         ),
+        const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: TextField(
@@ -239,6 +285,13 @@ class _JobsScreenState extends State<JobsScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
+              _FilterChip(
+                label: 'Favoris',
+                icon: Icons.favorite,
+                selected: _favoritesOnly,
+                onTap: () { setState(() => _favoritesOnly = !_favoritesOnly); _load(); },
+              ),
+              const _ChipGap(),
               _FilterChip(
                 label: 'Remote',
                 icon: Icons.wifi,
@@ -343,6 +396,7 @@ class _JobsScreenState extends State<JobsScreen> {
                                 _selected.contains(id) ? _selected.remove(id) : _selected.add(id);
                               });
                             },
+                            onLike: () => _toggleLike(_jobs[i]),
                           ),
                         ),
                       ),
@@ -421,7 +475,8 @@ class _JobCard extends StatelessWidget {
   final Job job;
   final bool selected;
   final VoidCallback onToggle;
-  const _JobCard({required this.job, required this.selected, required this.onToggle});
+  final VoidCallback onLike;
+  const _JobCard({required this.job, required this.selected, required this.onToggle, required this.onLike});
 
   String get _initial => job.company.isNotEmpty ? job.company[0].toUpperCase() : '•';
 
@@ -494,13 +549,20 @@ class _JobCard extends StatelessWidget {
             ],
             const Spacer(),
             IconButton(
+              onPressed: onLike,
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Aimer',
+              icon: Icon(job.liked ? Icons.favorite : Icons.favorite_border,
+                  color: job.liked ? AppTheme.red : AppTheme.muted2, size: 22),
+            ),
+            IconButton(
               onPressed: onToggle,
               visualDensity: VisualDensity.compact,
               tooltip: 'Ajouter à mon suivi',
               icon: Icon(selected ? Icons.bookmark : Icons.bookmark_add_outlined,
                   color: selected ? AppTheme.violetLight : AppTheme.muted2, size: 22),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 2),
             FilledButton.icon(
               onPressed: () => applyToJob(context, job),
               icon: const Icon(Icons.open_in_new, size: 16),
