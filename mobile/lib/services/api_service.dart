@@ -107,12 +107,14 @@ class ApiService {
   Future<List<Job>> jobs(
       {String query = '', String location = '', int limit = 50, bool sync = false,
       bool syncProfile = false, bool favoritesOnly = false,
-      String contract = '', bool remote = false, String sort = 'match'}) async {
+      String contract = '', bool remote = false, String sort = 'match',
+      bool alternance = false}) async {
     final r = await http.get(
         _u('/jobs', {
           'query': query, 'location': location, 'limit': limit, 'sync': sync,
           'sync_profile': syncProfile, 'favorites_only': favoritesOnly,
           'contract': contract, 'remote': remote, 'sort': sort,
+          'alternance': alternance,
         }),
         headers: _headers);
     final j = _decode(r);

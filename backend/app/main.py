@@ -145,9 +145,42 @@ def _profile(conn, uid):
     return d
 
 
+# --- alternance (work-study) detection + contact-email extraction ---
+_ALT_TERMS = ("alternance", "alternant", "apprentissage", "apprenti",
+              "contrat de professionnalisation", "contrat pro", "contrat d'apprentissage",
+              "work-study", "work study", "apprenticeship")
+# Popular domains scraped alongside "alternance" to maximise work-study coverage.
+_ALT_DOMAINS = ["informatique", "développeur", "marketing", "commerce", "vente",
+                "communication", "ressources humaines", "finance", "comptabilité",
+                "logistique", "design", "data"]
+_DESC_EMAIL_RE = _re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+# emails that are never a real recruiter contact
+_EMAIL_SKIP = ("noreply", "no-reply", "no_reply", "example.com", "example.org",
+               "sentry", "wixpress", "domain.com", "email.com", "mailer", "notification")
+
+
+def _extract_contact_email(text: str):
+    """First plausible recruiter email found in an offer's text, else None."""
+    for m in _DESC_EMAIL_RE.findall(text or ""):
+        ml = m.lower()
+        if not any(s in ml for s in _EMAIL_SKIP):
+            return m
+    return None
+
+
+def _is_alternance(job: dict) -> bool:
+    blob = (job.get("title", "") + " " + job.get("description", "") + " "
+            + " ".join(str(t) for t in (job.get("tags") or []))).lower()
+    return any(t in blob for t in _ALT_TERMS)
+
+
 def _job_row_to_dict(row):
     d = dict(row)
     d["tags"] = json.loads(d.get("tags") or "[]")
+    d["is_alternance"] = _is_alternance(d)
+    # surface a recruiter contact email when the advert itself includes one
+    d["contact_email"] = _extract_contact_email(
+        (d.get("description", "") or "") + " " + (d.get("company", "") or ""))
     return d
 
 
@@ -349,7 +382,8 @@ def _passes_filters(job: dict, contract: str, remote: bool) -> bool:
 def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool = False,
               sync_profile: bool = False, favorites_only: bool = False,
               contract: str = "", remote: bool = False, sort: str = "match",
-              max_age_days: int = 0, user: dict = Depends(current_user)):
+              max_age_days: int = 0, alternance: bool = False,
+              user: dict = Depends(current_user)):
     """List jobs, ranked by CV match for seekers.
 
     The query is expanded (FR<->EN + synonyms) to surface more, more varied offers
@@ -373,6 +407,15 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
     elif sync:
         for v in variants:
             scrape_all(v, location)
+
+    # Alternance mode: aggressively scrape work-study offers across popular
+    # domains (on an explicit sync/refresh) so the feed is packed with them.
+    if alternance and sync:
+        base = query.strip()
+        alt_queries = ([base] if base else []) + ["alternance"] \
+            + [f"alternance {d}" for d in _ALT_DOMAINS]
+        for q in alt_queries[:9]:
+            scrape_all(q, location)
 
     def build():
         sql = "SELECT * FROM jobs WHERE 1=1"
@@ -408,7 +451,9 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
         # self-populate when empty (e.g. fresh/ephemeral DB) — even with no query,
         # scrape a default set so the feed is never empty on first load.
         if not rows and not favorites_only:
-            for v in (variants if query else ["", "developer", "alternance"]):
+            populate = (["alternance"] + [f"alternance {d}" for d in _ALT_DOMAINS[:5]]) \
+                if alternance else (variants if query else ["", "developer", "alternance"])
+            for v in populate:
                 scrape_all(v, location)
             sql, args = build()
             rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
@@ -417,6 +462,8 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
         age = _job_age_days(j)
         return age is None or age <= max_age_days
     rows = [j for j in rows if _recent(j)]
+    if alternance:
+        rows = [j for j in rows if j["is_alternance"]]
     if contract or remote:
         rows = [j for j in rows if _passes_filters(j, contract, remote)]
     for j in rows:

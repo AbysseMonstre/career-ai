@@ -58,6 +58,7 @@ class _JobsScreenState extends State<JobsScreen> {
   String _contract = ''; // '' | cdi | cdd | freelance | stage | alternance
   bool _remote = false;
   bool _favoritesOnly = false;
+  bool _alternance = false; // work-study mode: aggressively fetch alternance offers
   String _sort = 'match'; // match | recent
 
   static const _categories = {
@@ -144,7 +145,27 @@ class _JobsScreenState extends State<JobsScreen> {
       final api = context.read<AppState>().api;
       _jobs = await api.jobs(
           query: _search.text.trim(), location: _location.text.trim(),
-          contract: _contract, remote: _remote, sort: _sort, favoritesOnly: _favoritesOnly);
+          contract: _contract, remote: _remote, sort: _sort,
+          favoritesOnly: _favoritesOnly, alternance: _alternance);
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // Work-study mode: ask the backend to scrape alternance across many domains
+  // and return only work-study offers (with recruiter contact when available).
+  Future<void> _loadAlternance() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _loading = true);
+    try {
+      final api = context.read<AppState>().api;
+      await api.activityPing();
+      _jobs = await api.jobs(
+          query: _search.text.trim(), location: _location.text.trim(),
+          alternance: true, sync: true, sort: _sort, favoritesOnly: _favoritesOnly);
+      if (mounted) showOk(context, '${_jobs.length} offres en alternance');
     } catch (e) {
       if (mounted) showError(context, e);
     } finally {
@@ -184,7 +205,8 @@ class _JobsScreenState extends State<JobsScreen> {
       final api = context.read<AppState>().api;
       _jobs = await api.jobs(
           query: q, location: loc, sync: true,
-          contract: _contract, remote: _remote, sort: _sort, favoritesOnly: _favoritesOnly);
+          contract: _contract, remote: _remote, sort: _sort,
+          favoritesOnly: _favoritesOnly, alternance: _alternance);
       if (mounted) {
         showOk(context, '${_jobs.length} offres synchronisées${loc.isEmpty ? '' : ' · $loc'}');
       }
@@ -286,6 +308,16 @@ class _JobsScreenState extends State<JobsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               _FilterChip(
+                label: 'Alternance',
+                icon: Icons.school,
+                selected: _alternance,
+                onTap: () {
+                  setState(() => _alternance = !_alternance);
+                  _alternance ? _loadAlternance() : _load();
+                },
+              ),
+              const _ChipGap(),
+              _FilterChip(
                 label: 'Favoris',
                 icon: Icons.favorite,
                 selected: _favoritesOnly,
@@ -301,7 +333,7 @@ class _JobsScreenState extends State<JobsScreen> {
               const _ChipGap(),
               ...{
                 '': 'Tous', 'cdi': 'CDI', 'cdd': 'CDD', 'freelance': 'Freelance',
-                'stage': 'Stage', 'alternance': 'Alternance',
+                'stage': 'Stage',
               }.entries.map((e) => Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: _FilterChip(
@@ -539,6 +571,23 @@ class _JobCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(children: [
             _SourceBadge(job.source),
+            if (job.isAlternance) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.violetLight.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                  Icon(Icons.school, size: 12, color: AppTheme.violetLight),
+                  SizedBox(width: 3),
+                  Text('Alternance',
+                      style: TextStyle(fontSize: 11, color: AppTheme.violetLight,
+                          fontWeight: FontWeight.w600)),
+                ]),
+              ),
+            ],
             if (job.salary.isNotEmpty) ...[
               const SizedBox(width: 8),
               Flexible(
@@ -572,6 +621,19 @@ class _JobCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16)),
             ),
           ]),
+          if (job.contactEmail != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => openJobUrl(context,
+                    'mailto:${job.contactEmail}?subject=${Uri.encodeComponent('Candidature — ${job.title}')}'),
+                icon: const Icon(Icons.alternate_email, size: 16),
+                label: Text('Contacter le recruteur · ${job.contactEmail}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ],
         ],
       ),
     );

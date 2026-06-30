@@ -29,6 +29,12 @@ _SYN = {
     "juriste": ["legal", "lawyer", "juridique"],
     "professeur": ["teacher", "enseignant", "formateur"],
     "chef de produit": ["product manager", "product owner"],
+    # work-study / apprenticeship (alternance) — bidirectional, so one search
+    # for "alternance" also pulls offers worded as apprentissage, alternant, etc.
+    "alternance": ["apprentissage", "alternant", "contrat de professionnalisation", "work-study"],
+    "apprentissage": ["alternance", "alternant", "apprenti"],
+    "alternant": ["alternance", "apprentissage", "apprenti"],
+    "apprenti": ["apprentissage", "alternance", "alternant"],
 }
 
 

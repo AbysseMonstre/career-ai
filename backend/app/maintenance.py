@@ -23,8 +23,10 @@ def purge_expired():
         )
 
 
-# popular queries kept warm so the feed is never empty
-WARM_QUERIES = ["python", "javascript", "data", "design", "marketing", "devops"]
+# popular queries kept warm so the feed is never empty (incl. work-study)
+WARM_QUERIES = ["python", "javascript", "data", "design", "marketing", "devops",
+                "alternance", "alternance informatique", "alternance commerce",
+                "alternance marketing", "apprentissage"]
 
 
 def _refresh_jobs():

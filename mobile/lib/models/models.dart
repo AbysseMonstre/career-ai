@@ -51,6 +51,8 @@ class Job {
   final List<String> tags;
   final String salary;
   final MatchStats? match;
+  final bool isAlternance;
+  final String? contactEmail; // recruiter email found in the advert, if any
   bool liked; // mutable so the heart toggles instantly
 
   Job({
@@ -64,6 +66,8 @@ class Job {
     required this.tags,
     required this.salary,
     this.match,
+    this.isAlternance = false,
+    this.contactEmail,
     this.liked = false,
   });
 
@@ -78,6 +82,10 @@ class Job {
         tags: List<String>.from(j['tags'] ?? []),
         salary: j['salary'] ?? '',
         match: j['match'] != null ? MatchStats.fromJson(j['match']) : null,
+        isAlternance: j['is_alternance'] == true,
+        contactEmail: (j['contact_email'] as String?)?.isNotEmpty == true
+            ? j['contact_email'] as String
+            : null,
         liked: j['liked'] == true,
       );
 }
