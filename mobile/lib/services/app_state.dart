@@ -10,7 +10,13 @@ class AppState extends ChangeNotifier {
   bool loading = true;
   bool onboarded = true;
 
-  AppState({String? apiBaseUrl}) : api = ApiService(baseUrl: apiBaseUrl);
+  AppState({String? apiBaseUrl}) : api = ApiService(baseUrl: apiBaseUrl) {
+    // When the server rejects a stored token, log out so the UI returns to the
+    // auth screen instead of showing "invalid or expired token" on every action.
+    api.onUnauthorized = () {
+      if (user != null) logout();
+    };
+  }
 
   bool get isLoggedIn => user != null;
 
@@ -70,7 +76,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    // Clear auth keys only — keep 'onboarded' so we don't replay the intro.
+    for (final k in ['token', 'uid', 'email', 'name', 'role']) {
+      await prefs.remove(k);
+    }
     api.setToken(null);
     user = null;
     notifyListeners();

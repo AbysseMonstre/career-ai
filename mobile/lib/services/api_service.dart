@@ -34,6 +34,10 @@ class ApiService {
   final String baseUrl;
   String? _token;
 
+  /// Called when the server rejects our token (HTTP 401) on an authenticated
+  /// request — lets [AppState] clear the stale session and return to login.
+  void Function()? onUnauthorized;
+
   void setToken(String? token) => _token = token;
 
   Map<String, String> get _headers => {
@@ -47,6 +51,9 @@ class ApiService {
   dynamic _decode(http.Response r) {
     final body = r.body.isEmpty ? {} : jsonDecode(r.body);
     if (r.statusCode >= 200 && r.statusCode < 300) return body;
+    // A 401 on a call we made *with* a token means the token is stale/expired
+    // (e.g. backend restarted or DB reset) — drop the session cleanly.
+    if (r.statusCode == 401 && _token != null) onUnauthorized?.call();
     final detail = (body is Map && body['detail'] != null) ? body['detail'] : 'Erreur ${r.statusCode}';
     throw ApiException(detail.toString(), r.statusCode);
   }

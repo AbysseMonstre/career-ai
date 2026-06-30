@@ -1,7 +1,21 @@
-"""Thin SQLite layer — no ORM, stdlib only, so the backend runs anywhere."""
+"""Database layer.
+
+Default: SQLite (stdlib only, runs anywhere — local dev, tests).
+Optional: PostgreSQL when ``CAREER_AI_DATABASE_URL`` (or ``DATABASE_URL``) is set
+— gives real persistence on hosts with an ephemeral filesystem (e.g. Render free).
+
+The rest of the app speaks one dialect: ``?`` placeholders, ``sqlite3.Row``-style
+rows accessed by column name, ``cur.lastrowid`` after inserts, ``ON CONFLICT`` upserts.
+A thin shim (`_PgConn`) translates that to psycopg for the Postgres path, so no
+query in the app code needs to change.
+"""
 import sqlite3
 import os
+import re
 from contextlib import contextmanager
+
+DATABASE_URL = os.environ.get("CAREER_AI_DATABASE_URL") or os.environ.get("DATABASE_URL")
+IS_PG = bool(DATABASE_URL) and DATABASE_URL.startswith(("postgres://", "postgresql://"))
 
 DB_PATH = os.environ.get(
     "CAREER_AI_DB", os.path.join(os.path.dirname(__file__), "..", "career_ai.db"))
@@ -126,22 +140,124 @@ _MIGRATIONS = [
     ("applications", "cover_letter", "ALTER TABLE applications ADD COLUMN cover_letter TEXT DEFAULT ''"),
 ]
 
+# ---------------------------------------------------------------------------
+# Postgres compatibility shim
+# ---------------------------------------------------------------------------
+
+# Tables whose primary key is a serial ``id`` — only these get ``RETURNING id``
+# appended so that ``cur.lastrowid`` keeps working on the Postgres path.
+_ID_TABLES = {"users", "jobs", "applications", "contact_requests",
+              "interviews", "training_sessions", "placement_requests"}
+
+_DT_NOW = re.compile(r"datetime\('now',\s*\?\)")          # -> now() + interval
+_INSERT_TBL = re.compile(r"^\s*INSERT\s+INTO\s+(\w+)", re.I)
+
+
+def _translate_sql(sql: str):
+    """Rewrite a SQLite query for psycopg. Returns (query, fetch_returning?)."""
+    s = sql
+    need_nothing = False
+    if re.search(r"INSERT\s+OR\s+IGNORE", s, re.I):
+        s = re.sub(r"INSERT\s+OR\s+IGNORE", "INSERT", s, flags=re.I)
+        need_nothing = True
+    s = _DT_NOW.sub("(now() + (?)::interval)", s)
+    # Escape literal % (e.g. LIKE '%remote%') *before* turning ? into %s.
+    s = s.replace("%", "%%").replace("?", "%s")
+
+    add_returning = False
+    m = _INSERT_TBL.match(s)
+    if m:
+        tbl = m.group(1).lower()
+        has_conflict = "ON CONFLICT" in s.upper()
+        if need_nothing and not has_conflict:
+            s = s.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+            has_conflict = True
+        if tbl in _ID_TABLES and not has_conflict and "RETURNING" not in s.upper():
+            s = s.rstrip().rstrip(";") + " RETURNING id"
+            add_returning = True
+    return s, add_returning
+
+
+def _translate_ddl(ddl: str) -> str:
+    return re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT",
+                  "SERIAL PRIMARY KEY", ddl, flags=re.I)
+
+
+class _Cur:
+    """Minimal cursor facade exposing the bits the app relies on."""
+    def __init__(self, cur, lastrowid=None):
+        self._cur = cur
+        self.lastrowid = lastrowid
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+
+class _PgConn:
+    """Wraps a psycopg connection to mimic the sqlite3 connection API used here."""
+    def __init__(self, raw, dict_row):
+        self._raw = raw
+        self._dict_row = dict_row
+
+    def execute(self, sql, params=()):
+        q, add_returning = _translate_sql(sql)
+        cur = self._raw.cursor(row_factory=self._dict_row)
+        cur.execute(q, tuple(params))
+        last = None
+        if add_returning:
+            row = cur.fetchone()
+            last = row["id"] if row else None
+        return _Cur(cur, last)
+
+    def commit(self):
+        self._raw.commit()
+
+    def close(self):
+        self._raw.close()
+
 
 def init_db():
     with get_conn() as conn:
-        conn.executescript(SCHEMA)
-        for table, column, ddl in _MIGRATIONS:
-            cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
-            if column not in cols:
-                conn.execute(ddl)
+        if IS_PG:
+            for stmt in SCHEMA.split(";"):
+                if stmt.strip():
+                    conn.execute(_translate_ddl(stmt))
+            for table, column, ddl in _MIGRATIONS:
+                exists = conn.execute(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name=? AND column_name=?",
+                    (table, column)).fetchone()
+                if not exists:
+                    conn.execute(ddl)  # ALTER TABLE ... ADD COLUMN (valid in PG)
+        else:
+            conn.executescript(SCHEMA)
+            for table, column, ddl in _MIGRATIONS:
+                cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+                if column not in cols:
+                    conn.execute(ddl)
 
 
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+    if IS_PG:
+        import psycopg
+        from psycopg.rows import dict_row
+        # autocommit: each statement is independent, so a caught duplicate-insert
+        # error (e.g. in auto-apply) never poisons later statements in the block.
+        raw = psycopg.connect(DATABASE_URL, autocommit=True)
+        conn = _PgConn(raw, dict_row)
+        try:
+            yield conn
+        finally:
+            conn.close()
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
