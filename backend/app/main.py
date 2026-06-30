@@ -405,9 +405,12 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
             "SELECT job_id FROM favorites WHERE user_id=?", (user["id"],)).fetchall()}
         sql, args = build()
         rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
-        if not rows and (query or location):
-            for v in variants:
+        # self-populate when empty (e.g. fresh/ephemeral DB) — even with no query,
+        # scrape a default set so the feed is never empty on first load.
+        if not rows and not favorites_only:
+            for v in (variants if query else ["", "developer", "alternance"]):
                 scrape_all(v, location)
+            sql, args = build()
             rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
 
     def _recent(j):
