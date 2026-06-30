@@ -31,6 +31,27 @@ def _is_formation_ad(r: dict) -> bool:
     return any(p in blob for p in _FORMATION_PHRASE)
 
 
+# Malformed / placeholder rows that must never reach the feed.
+_JUNK_TITLES = {
+    "job title", "title", "learn more", "read more", "untitled", "n/a", "na",
+    "none", "test", "example", "i am looking for guide", "apply now",
+}
+
+
+def _is_junk(r: dict) -> bool:
+    """Drop rows with empty/placeholder/numeric titles (parsing artefacts)."""
+    t = (r.get("title") or "").strip().lower()
+    if len(t) < 3:
+        return True
+    if t in _JUNK_TITLES:
+        return True
+    if t.replace(" ", "").isdigit():       # e.g. "1419", "2035"
+        return True
+    if not r.get("url"):                    # no link to apply -> unusable
+        return True
+    return False
+
+
 def scrape_all(query: str = "", location: str = "") -> dict:
     """Fetch from all sources concurrently and upsert into the jobs table.
 
@@ -56,8 +77,8 @@ def scrape_all(query: str = "", location: str = "") -> dict:
                                 + " ".join(str(t) for t in (r["tags"] or []))).lower()
                         return all(w in blob for w in words)
                     rows = [r for r in rows if _match(r)]
-            # drop school/training adverts (they are not real job offers)
-            rows = [r for r in rows if not _is_formation_ad(r)]
+            # drop school/training adverts and malformed/placeholder rows
+            rows = [r for r in rows if not _is_formation_ad(r) and not _is_junk(r)]
             summary[name] = len(rows)
             jobs.extend(rows)
 

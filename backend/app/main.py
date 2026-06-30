@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from .database import get_conn, init_db
 from . import security, cv_parser, matching, notifications, config, cover_letter, expansion
 from .scrapers import scrape_all
+from .scrapers.aggregator import _is_junk
 
 app = FastAPI(title="Career AI", version="1.0")
 app.add_middleware(
@@ -451,8 +452,19 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
         # self-populate when empty (e.g. fresh/ephemeral DB) — even with no query,
         # scrape a default set so the feed is never empty on first load.
         if not rows and not favorites_only:
-            populate = (["alternance"] + [f"alternance {d}" for d in _ALT_DOMAINS[:5]]) \
-                if alternance else (variants if query else ["", "developer", "alternance"])
+            if alternance:
+                base = query.strip()
+                populate = ([base] if base else []) + ["alternance"] \
+                    + [f"alternance {d}" for d in _ALT_DOMAINS[:5]]
+            elif query:
+                populate = variants
+            elif profile is not None and (profile.get("title") or profile.get("skills")):
+                # no search + a CV on file: fetch offers for the candidate's own
+                # profile so the feed stays relevant (never a generic dump).
+                seeds = [profile.get("title", "")] + (profile.get("skills") or [])[:4]
+                populate = [s for s in seeds if s][:5]
+            else:
+                populate = ["", "developer", "alternance"]
             for v in populate:
                 scrape_all(v, location)
             sql, args = build()
@@ -461,7 +473,8 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
     def _recent(j):
         age = _job_age_days(j)
         return age is None or age <= max_age_days
-    rows = [j for j in rows if _recent(j)]
+    # drop stale offers and any malformed/placeholder rows still in the DB
+    rows = [j for j in rows if _recent(j) and not _is_junk(j)]
     if alternance:
         rows = [j for j in rows if j["is_alternance"]]
     if contract or remote:
@@ -474,6 +487,24 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
     if profile is not None:
         for j in rows:
             j["match"] = matching.score(profile, j)
+
+    # Relevance is mandatory: the feed must relate to the user's search, or —
+    # when there is no search — to their CV profile. With a text query the SQL
+    # already constrained results; here we enforce the no-query case so the feed
+    # is never a generic dump of unrelated offers.
+    if is_seeker and not query and profile is not None:
+        terms = [w for w in (profile.get("title", "") or "").lower().split() if len(w) >= 4]
+        terms += [s.lower() for s in (profile.get("skills") or []) if len(s) >= 3]
+        if terms:
+            def _related(j):
+                blob = (j.get("title", "") + " " + j.get("description", "") + " "
+                        + " ".join(str(t) for t in (j.get("tags") or []))).lower()
+                return any(t in blob for t in terms) or (j.get("match", {}).get("score", 0) >= 20)
+            related = [j for j in rows if _related(j)]
+            # keep relevance; only fall back to best matches if it emptied the feed
+            rows = related if related else sorted(
+                rows, key=lambda x: x.get("match", {}).get("score", 0), reverse=True)[:limit]
+
     if sort == "recent":
         rows.sort(key=lambda x: x.get("fetched_at", ""), reverse=True)
     elif profile is not None:
