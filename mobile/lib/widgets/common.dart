@@ -42,6 +42,78 @@ class RadarOctagon extends StatelessWidget {
   }
 }
 
+/// Always-visible logout control. `labeled` shows a full red button; otherwise
+/// a compact icon. Works from anywhere, even a screen that failed to load.
+class LogoutButton extends StatelessWidget {
+  final bool labeled;
+  const LogoutButton({super.key, this.labeled = false});
+
+  Future<void> _logout(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.sheet,
+        title: const Text('Se déconnecter ?'),
+        content: const Text('Vous pourrez vous reconnecter avec votre email et mot de passe.',
+            style: TextStyle(color: AppTheme.muted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Se déconnecter'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) await context.read<AppState>().logout();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (labeled) {
+      return OutlinedButton.icon(
+        onPressed: () => _logout(context),
+        icon: const Icon(Icons.logout, size: 18, color: AppTheme.red),
+        label: const Text('Se déconnecter', style: TextStyle(color: AppTheme.red)),
+        style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.red)),
+      );
+    }
+    return IconButton(
+      onPressed: () => _logout(context),
+      icon: const Icon(Icons.logout),
+      color: AppTheme.red,
+      tooltip: 'Se déconnecter',
+    );
+  }
+}
+
+/// Fallback shown when a screen can't reach the server — keeps logout reachable.
+class LoadErrorView extends StatelessWidget {
+  final VoidCallback onRetry;
+  final String message;
+  const LoadErrorView({super.key, required this.onRetry,
+      this.message = 'Connexion au serveur impossible (le serveur gratuit peut mettre ~30 s à se réveiller).'});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.cloud_off, size: 48, color: AppTheme.muted2),
+          const SizedBox(height: 12),
+          Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.muted)),
+          const SizedBox(height: 16),
+          FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Réessayer')),
+          const SizedBox(height: 8),
+          const LogoutButton(labeled: true),
+        ]),
+      ),
+    );
+  }
+}
+
 /// Account actions: logout + RGPD account deletion (right to erasure).
 class AccountMenu extends StatelessWidget {
   const AccountMenu({super.key});

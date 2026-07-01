@@ -41,7 +41,7 @@ class _SeekerDashboardScreenState extends State<SeekerDashboardScreen> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     final d = _data;
-    if (d == null) return const Center(child: Text('Erreur de chargement'));
+    if (d == null) return LoadErrorView(onRetry: _load);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -50,7 +50,10 @@ class _SeekerDashboardScreenState extends State<SeekerDashboardScreen> {
         children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             const Text('Mon tableau de bord', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const AccountMenu(),
+            Row(mainAxisSize: MainAxisSize.min, children: const [
+              LogoutButton(),
+              AccountMenu(),
+            ]),
           ]),
           const SizedBox(height: 12),
           if (_activity != null) _StreakCard(_activity!),

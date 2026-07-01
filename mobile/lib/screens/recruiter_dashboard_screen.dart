@@ -36,7 +36,7 @@ class _RecruiterDashboardScreenState extends State<RecruiterDashboardScreen> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     final d = _data;
-    if (d == null) return const Center(child: Text('Erreur de chargement'));
+    if (d == null) return LoadErrorView(onRetry: _load);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -44,11 +44,14 @@ class _RecruiterDashboardScreenState extends State<RecruiterDashboardScreen> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Expanded(
+            const Expanded(
               child: Text('Tableau recruteur',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             ),
-            const AccountMenu(),
+            Row(mainAxisSize: MainAxisSize.min, children: const [
+              LogoutButton(),
+              AccountMenu(),
+            ]),
           ]),
           const SizedBox(height: 12),
           GridView.count(
