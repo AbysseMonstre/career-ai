@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from .database import get_conn, init_db
 from . import security, cv_parser, matching, notifications, config, cover_letter, expansion
 from .scrapers import scrape_all
-from .scrapers.aggregator import _is_junk
+from .scrapers.aggregator import _is_junk, _is_formation_ad
 
 app = FastAPI(title="Career AI", version="1.0")
 app.add_middleware(
@@ -473,8 +473,10 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
     def _recent(j):
         age = _job_age_days(j)
         return age is None or age <= max_age_days
-    # drop stale offers and any malformed/placeholder rows still in the DB
-    rows = [j for j in rows if _recent(j) and not _is_junk(j)]
+    # drop stale offers, malformed rows, and school/training adverts (never real
+    # jobs — especially rife in alternance). Applied at serve time too, so old
+    # rows scraped before the filter tightened can never reach the feed.
+    rows = [j for j in rows if _recent(j) and not _is_junk(j) and not _is_formation_ad(j)]
     if alternance:
         rows = [j for j in rows if j["is_alternance"]]
     if contract or remote:

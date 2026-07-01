@@ -7,23 +7,42 @@ from ..database import get_conn
 
 # Training providers / schools that advertise "formations" instead of real jobs.
 _FORMATION_COMPANY = [
-    "cfa", "centre de formation", "ecole", "école", "campus", "openclassrooms",
-    "studi", "iscod", "ifocop", "skill and you", "academie", "académie", "academy",
-    "afpa", "greta", "organisme de formation", "icademie", "ynov", "digital school",
-    "digital campus", "walter learning", "doranco", "ipac", "my digital school",
-    "alternance.com", "diplomeo", "nextformation", "formaposte",
+    "cfa", "centre de formation", "ecole", "école", "school", "campus",
+    "openclassrooms", "studi", "iscod", "ifocop", "skill and you", "academie",
+    "académie", "academy", "afpa", "greta", "organisme de formation", "icademie",
+    "ynov", "digital school", "digital campus", "walter learning", "doranco",
+    "ipac", "my digital school", "alternance.com", "diplomeo", "nextformation",
+    "formaposte", "cnam", "institut de formation", "college de paris", "collège de paris",
+    "pigier", "iscom", "isefac", "iscpa", "esg", "cesi", "esaip", "supdeweb",
+    "3w academy", "the bridge", "wall street english", "eni ecole", "efab", "ipi",
+    "digital college", "formasup", "aftec", "isifa", "igs", "iesa", "esupcom",
+    "sup de", "esiee", "esarc", "win sport school", "sport management school",
+    "e-learning", "mastere ", "mastère ", "bachelor factory", "école de", "ecole de",
+    "cci formation", "faculté des métiers", "centre de formation", "institut de formation",
 ]
-# Title/description phrases that signal a training advert (not an employer offer).
+# Phrases that only a school selling its own formation uses (an employer
+# describing an alternance may say "vous préparez un diplôme", so generic
+# wording like that is intentionally NOT here — it would drop real offers).
 _FORMATION_PHRASE = [
-    "préparez un", "préparez votre", "obtenez un diplôme", "obtenez votre diplôme",
-    "formation diplômante", "intègre notre formation", "rejoignez notre formation",
-    "titre rncp", "formation en alternance", "alternance - formation",
-    "formation gratuite", "rémunérée et diplômante", "préparation au",
+    "obtenez un diplôme", "obtenez votre diplôme", "formation diplômante",
+    "intègre notre formation", "intègre notre école", "rejoignez notre formation",
+    "rejoins notre formation", "rejoins notre école", "formation gratuite",
+    "rémunérée et diplômante", "notre organisme de formation",
+    "notre centre de formation", "frais de formation", "financé par le cpf",
+    "éligible cpf", "eligible cpf", "prise en charge à 100",
+    "postule à notre formation", "candidature à notre formation",
+    "nos formations", "cursus diplômant", "intègre notre cursus",
+    "notre école recrute pour", "rejoindre notre formation", "intégrer notre formation",
 ]
 
 
 def _is_formation_ad(r: dict) -> bool:
-    """True if the offer is a school/training advert rather than a real job."""
+    """True if the offer is a school/training advert rather than a real job.
+
+    Alternance listings are especially polluted by CFA/écoles selling a
+    "formation" dressed up as a job, so this filter is applied at scrape time
+    *and* at serve time for work-study results.
+    """
     company = (r.get("company") or "").lower()
     if any(k in company for k in _FORMATION_COMPANY):
         return True
