@@ -706,7 +706,7 @@ def _safe_ping(uid: int):
         with get_conn() as conn:
             conn.execute(
                 """INSERT INTO activity (user_id, day, count) VALUES (?, ?, 1)
-                   ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1""",
+                   ON CONFLICT(user_id, day) DO UPDATE SET count = activity.count + 1""",
                 (uid, today))
     except Exception:
         pass
@@ -722,7 +722,7 @@ def activity_ping(user: dict = Depends(current_user)):
     with get_conn() as conn:
         conn.execute(
             """INSERT INTO activity (user_id, day, count) VALUES (?, ?, 1)
-               ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1""",
+               ON CONFLICT(user_id, day) DO UPDATE SET count = activity.count + 1""",
             (user["id"], today))
     return {"ok": True, "day": today}
 

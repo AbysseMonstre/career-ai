@@ -160,7 +160,12 @@ def _translate_sql(sql: str):
     if re.search(r"INSERT\s+OR\s+IGNORE", s, re.I):
         s = re.sub(r"INSERT\s+OR\s+IGNORE", "INSERT", s, flags=re.I)
         need_nothing = True
-    s = _DT_NOW.sub("(now() + (?)::interval)", s)
+    # timestamp columns are TEXT, so compare against a TEXT value (Postgres won't
+    # compare text < timestamptz). ISO text compares chronologically.
+    s = _DT_NOW.sub("(now() + (?)::interval)::text", s)
+    # timestamp columns are TEXT here, so keep CURRENT_TIMESTAMP producing text
+    # (Postgres won't assign a timestamptz to a text column without a cast).
+    s = re.sub(r"CURRENT_TIMESTAMP", "now()::text", s, flags=re.I)
     # Escape literal % (e.g. LIKE '%remote%') *before* turning ? into %s.
     s = s.replace("%", "%%").replace("?", "%s")
 
@@ -179,8 +184,15 @@ def _translate_sql(sql: str):
 
 
 def _translate_ddl(ddl: str) -> str:
-    return re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT",
-                  "SERIAL PRIMARY KEY", ddl, flags=re.I)
+    ddl = re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT",
+                 "SERIAL PRIMARY KEY", ddl, flags=re.I)
+    # Drop inline FOREIGN KEY references: they impose a create order (favorites
+    # references jobs) that SQLite ignores but Postgres enforces. The app manages
+    # relationships in code and SQLite never enforced these at runtime anyway.
+    ddl = re.sub(r"\s+REFERENCES\s+\w+\s*\([^)]*\)", "", ddl, flags=re.I)
+    # TEXT timestamp columns: cast the default so Postgres accepts it.
+    ddl = re.sub(r"DEFAULT\s+CURRENT_TIMESTAMP", "DEFAULT now()::text", ddl, flags=re.I)
+    return ddl
 
 
 class _Cur:
