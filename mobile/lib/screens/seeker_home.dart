@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/common.dart';
 import 'jobs_screen.dart';
 import 'applications_screen.dart';
 import 'insights_screen.dart';
@@ -24,7 +25,12 @@ class _SeekerHomeState extends State<SeekerHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: _pages[_index]),
+      body: SafeArea(
+        child: Column(children: [
+          const CareerTopBar(),
+          Expanded(child: _pages[_index]),
+        ]),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

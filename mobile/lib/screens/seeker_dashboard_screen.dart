@@ -45,12 +45,8 @@ class _SeekerDashboardScreenState extends State<SeekerDashboardScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Row(children: const [
-            Expanded(child: Text('Tableau de bord', maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
-            LogoutButton(labeled: true),
-            AccountMenu(),
-          ]),
+          child: const Text('Mon tableau de bord',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         ),
         Expanded(
           child: _loading

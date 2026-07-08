@@ -88,6 +88,58 @@ class LogoutButton extends StatelessWidget {
   }
 }
 
+/// Shared top bar shown on every seeker/recruiter screen: brand on the left,
+/// an always-visible "Se déconnecter" button (+ account menu) on the right.
+/// A plain Row (not an AppBar) so it renders reliably over the aurora theme.
+class CareerTopBar extends StatelessWidget {
+  const CareerTopBar({super.key});
+
+  Future<void> _logout(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.sheet,
+        title: const Text('Se déconnecter ?'),
+        content: const Text('Vous pourrez vous reconnecter avec votre email et mot de passe.',
+            style: TextStyle(color: AppTheme.muted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Se déconnecter'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) await context.read<AppState>().logout();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 8, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('Career AI',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          TextButton.icon(
+            onPressed: () => _logout(context),
+            icon: const Icon(Icons.logout, size: 18, color: AppTheme.red),
+            label: const Text('Déconnexion',
+                style: TextStyle(color: AppTheme.red, fontWeight: FontWeight.w700)),
+            style: TextButton.styleFrom(
+              backgroundColor: AppTheme.red.withValues(alpha: 0.12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Fallback shown when a screen can't reach the server — keeps logout reachable.
 class LoadErrorView extends StatelessWidget {
   final VoidCallback onRetry;
