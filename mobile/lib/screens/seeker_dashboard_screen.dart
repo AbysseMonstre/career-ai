@@ -59,6 +59,7 @@ class _SeekerDashboardScreenState extends State<SeekerDashboardScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                         children: [
           const SizedBox(height: 12),
+          if (d.skills.isEmpty) ...[const CvNudge(), const SizedBox(height: 4)],
           if (_activity != null) _StreakCard(_activity!),
           const SizedBox(height: 12),
           GridView.count(
@@ -111,6 +112,9 @@ class _SeekerDashboardScreenState extends State<SeekerDashboardScreen> {
               ]),
             ),
           ),
+          const SizedBox(height: 24),
+          const DeleteAccountButton(),
+          const LegalLink(),
                         ],
                       ),
                     ),

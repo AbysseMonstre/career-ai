@@ -47,6 +47,14 @@ async def security_headers(request: Request, call_next):
 
 _EMAIL_RE = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+import unicodedata
+
+
+def _unaccent(s: str) -> str:
+    """Strip accents so search is accent-insensitive (développeur == developpeur)."""
+    return "".join(c for c in unicodedata.normalize("NFD", s or "")
+                   if unicodedata.category(c) != "Mn")
+
 
 def _client_key(request: Request, suffix: str) -> str:
     ip = request.client.host if request.client else "?"
@@ -422,23 +430,11 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
         for q in alt_queries[:9]:
             scrape_all(q, location)
 
+    # Query matching is done in Python so it is ACCENT-INSENSITIVE (e.g. searching
+    # "developpeur" matches "développeur"). Location stays in SQL.
     def build():
         sql = "SELECT * FROM jobs WHERE 1=1"
         args = []
-        if query:
-            ors = []
-            for v in variants:
-                words = [w for w in v.lower().split() if len(w) >= 3]
-                if not words:
-                    continue
-                conds = []
-                for w in words:
-                    conds.append("(LOWER(title) LIKE ? OR LOWER(description) LIKE ? OR LOWER(tags) LIKE ?)")
-                    like = f"%{w}%"
-                    args += [like, like, like]
-                ors.append("(" + " AND ".join(conds) + ")")
-            if ors:
-                sql += " AND (" + " OR ".join(ors) + ")"
         if location:
             sql += (" AND (LOWER(location) LIKE ? OR LOWER(location) LIKE '%remote%'"
                     " OR LOWER(location) LIKE '%anywhere%' OR LOWER(location) LIKE '%worldwide%'"
@@ -447,12 +443,28 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
         sql += " ORDER BY fetched_at DESC"
         return sql, args
 
+    _qterms = []
+    if query:
+        for v in variants:
+            ws = [_unaccent(w) for w in v.lower().split() if len(w) >= 3]
+            if ws:
+                _qterms.append(ws)
+
+    def _apply_query(rows):
+        if not _qterms:
+            return rows
+        def _m(j):
+            blob = _unaccent((j.get("title", "") + " " + j.get("description", "") + " "
+                              + " ".join(str(t) for t in (j.get("tags") or []))).lower())
+            return any(all(w in blob for w in ws) for ws in _qterms)
+        return [j for j in rows if _m(j)]
+
     with get_conn() as conn:
         profile = _profile(conn, user["id"]) if is_seeker else None
         favs = {r["job_id"] for r in conn.execute(
             "SELECT job_id FROM favorites WHERE user_id=?", (user["id"],)).fetchall()}
         sql, args = build()
-        rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
+        rows = _apply_query([_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()])
         # self-populate when empty (e.g. fresh/ephemeral DB) — even with no query,
         # scrape a default set so the feed is never empty on first load.
         if not rows and not favorites_only:
@@ -472,7 +484,7 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
             for v in populate:
                 scrape_all(v, location)
             sql, args = build()
-            rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
+            rows = _apply_query([_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()])
 
     def _recent(j):
         age = _job_age_days(j)
@@ -1217,7 +1229,8 @@ def recruiter_interviews(user: dict = Depends(require_role("recruiter"))):
 def my_interviews(user: dict = Depends(require_role("seeker"))):
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT id, company, scheduled_at, teams_link, message, status, created_at "
+            "SELECT id, company, scheduled_at, teams_link, meeting_type, location, "
+            "duration_min, message, status, created_at "
             "FROM interviews WHERE candidate_id=? ORDER BY id DESC", (user["id"],)).fetchall()
     return {"interviews": [dict(r) for r in rows]}
 

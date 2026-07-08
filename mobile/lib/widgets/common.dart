@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/app_state.dart';
+import '../screens/legal_screen.dart';
 
 /// 8-axis radar ("octagon") for the training breakdown.
 class RadarOctagon extends StatelessWidget {
@@ -136,6 +137,93 @@ class CareerTopBar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// RGPD "right to erasure": a subtle button that deletes the account after
+/// confirmation. Placed at the bottom of dashboards.
+class DeleteAccountButton extends StatelessWidget {
+  const DeleteAccountButton({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: TextButton.icon(
+        icon: const Icon(Icons.delete_outline, size: 16, color: AppTheme.muted2),
+        label: const Text('Supprimer mon compte (RGPD)',
+            style: TextStyle(color: AppTheme.muted2, fontSize: 12)),
+        onPressed: () async {
+          final ok = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AppTheme.sheet,
+              title: const Text('Supprimer mon compte ?'),
+              content: const Text(
+                'Toutes vos données (profil, CV, candidatures) seront définitivement '
+                'effacées. Action irréversible.',
+                style: TextStyle(color: AppTheme.muted),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: AppTheme.red),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Supprimer'),
+                ),
+              ],
+            ),
+          );
+          if (ok == true && context.mounted) {
+            try {
+              await context.read<AppState>().deleteAccount();
+            } catch (e) {
+              if (context.mounted) showError(context, e);
+            }
+          }
+        },
+      ),
+    );
+  }
+}
+
+/// Link to the legal / privacy page.
+class LegalLink extends StatelessWidget {
+  const LegalLink({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: TextButton(
+        onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const LegalScreen())),
+        child: const Text('Mentions légales & confidentialité',
+            style: TextStyle(color: AppTheme.muted2, fontSize: 12)),
+      ),
+    );
+  }
+}
+
+/// Prompt shown to seekers with no extracted skills: importing a CV makes them
+/// visible to recruiters with a real match score.
+class CvNudge extends StatelessWidget {
+  final VoidCallback? onImport;
+  const CvNudge({super.key, this.onImport});
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      child: Row(children: [
+        const Icon(Icons.upload_file, color: AppTheme.violetLight),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Text(
+            'Importez votre CV pour être repéré par les recruteurs et voir votre score de correspondance.',
+            style: TextStyle(fontSize: 13, height: 1.4),
+          ),
+        ),
+        if (onImport != null) ...[
+          const SizedBox(width: 8),
+          FilledButton(onPressed: onImport, child: const Text('Importer')),
+        ],
+      ]),
     );
   }
 }

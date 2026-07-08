@@ -232,10 +232,10 @@ class ApiService {
     return (j['interviews'] as List).map((e) => Interview.fromJson(e)).toList();
   }
 
-  Future<List<Map<String, dynamic>>> myInterviews() async {
+  Future<List<Interview>> myInterviews() async {
     final r = await http.get(_u('/me/interviews'), headers: _headers);
     final j = _decode(r);
-    return List<Map<String, dynamic>>.from(j['interviews']);
+    return (j['interviews'] as List).map((e) => Interview.fromJson(e)).toList();
   }
 
   Future<void> respondInterview(int id, bool accept) async {
