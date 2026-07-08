@@ -30,6 +30,10 @@ CONTACT_RETENTION_DAYS = int(os.environ.get("CAREER_AI_CONTACT_RETENTION_DAYS", 
 # --- auth policy ---
 MIN_PASSWORD_LEN = 8
 
+# Open the talent base to every recruiter (no manual approval). Candidate emails
+# are never exposed — recruiters contact/schedule through the platform.
+OPEN_TALENTS = os.environ.get("CAREER_AI_OPEN_TALENTS", "1") == "1"
+
 # --- background scheduler (periodic scrape + purge) ---
 SCHEDULER_ENABLED = os.environ.get("CAREER_AI_SCHEDULER", "0") == "1"
 REFRESH_EVERY_SEC = int(os.environ.get("CAREER_AI_REFRESH_SEC", str(6 * 3600)))

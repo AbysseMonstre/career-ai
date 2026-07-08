@@ -1021,6 +1021,8 @@ def recruiter_dashboard(user: dict = Depends(require_role("recruiter"))):
 
 # ---------- talent access (recruiter must contact us first) ----------
 def _talent_access(conn, uid) -> str:
+    if config.OPEN_TALENTS:
+        return "granted"  # open access: every recruiter can browse candidates
     row = conn.execute("SELECT talent_access FROM users WHERE id=?", (uid,)).fetchone()
     return (row["talent_access"] if row else "none") or "none"
 
@@ -1103,7 +1105,8 @@ def talents(query: str = "", job_id: Optional[int] = None,
                 "cv_text": r["cv_text"], "skills": json.loads(r["skills"] or "[]")}
         m = matching.score(prof, target)
         results.append({
-            "candidate_id": r["user_id"], "name": r["name"], "email": r["email"],
+            # email intentionally omitted — recruiters contact via the platform
+            "candidate_id": r["user_id"], "name": r["name"],
             "title": r["title"], "location": r["location"],
             "skills": prof["skills"], "match": m,
         })

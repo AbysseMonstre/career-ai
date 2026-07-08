@@ -5,6 +5,7 @@ import tempfile
 os.environ["CAREER_AI_DB"] = os.path.join(tempfile.gettempdir(), "career_ai_test.db")
 os.environ["CAREER_AI_ENV"] = "development"
 os.environ["CAREER_AI_ADMIN_TOKEN"] = "test-admin-token"
+os.environ["CAREER_AI_OPEN_TALENTS"] = "0"  # tests validate the gated path explicitly
 
 import pytest
 from fastapi.testclient import TestClient
