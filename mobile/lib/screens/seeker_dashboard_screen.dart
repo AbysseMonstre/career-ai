@@ -39,22 +39,30 @@ class _SeekerDashboardScreenState extends State<SeekerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
     final d = _data;
-    if (d == null) return LoadErrorView(onRetry: _load);
-
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Mon tableau de bord', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            Row(mainAxisSize: MainAxisSize.min, children: const [
-              LogoutButton(),
-              AccountMenu(),
-            ]),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Row(children: const [
+            Expanded(child: Text('Mon tableau de bord',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+            LogoutButton(labeled: true),
+            SizedBox(width: 4),
+            AccountMenu(),
           ]),
+        ),
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : d == null
+                  ? LoadErrorView(onRetry: _load)
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        children: [
           const SizedBox(height: 12),
           if (_activity != null) _StreakCard(_activity!),
           const SizedBox(height: 12),
@@ -108,8 +116,11 @@ class _SeekerDashboardScreenState extends State<SeekerDashboardScreen> {
               ]),
             ),
           ),
-        ],
-      ),
+                        ],
+                      ),
+                    ),
+        ),
+      ],
     );
   }
 
