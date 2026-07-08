@@ -137,6 +137,7 @@ class Candidate {
   final String location;
   final List<String> skills;
   final MatchStats match;
+  final int applied; // number of offers this candidate has applied to
 
   Candidate({
     required this.candidateId,
@@ -146,6 +147,7 @@ class Candidate {
     required this.location,
     required this.skills,
     required this.match,
+    this.applied = 0,
   });
 
   factory Candidate.fromJson(Map<String, dynamic> j) => Candidate(
@@ -156,6 +158,7 @@ class Candidate {
         location: j['location'] ?? '',
         skills: List<String>.from(j['skills'] ?? []),
         match: MatchStats.fromJson(j['match']),
+        applied: j['applied'] ?? 0,
       );
 }
 

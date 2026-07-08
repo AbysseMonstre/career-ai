@@ -1094,10 +1094,14 @@ def talents(query: str = "", job_id: Optional[int] = None,
                   "tags": query.split() if query else []}
 
     with get_conn() as conn:
+        # A candidate shows up once they are real & active: they uploaded a CV
+        # (have skills) OR they applied to at least one offer.
         rows = conn.execute(
-            """SELECT p.user_id, p.title, p.location, p.skills, p.cv_text, u.name, u.email
+            """SELECT p.user_id, p.title, p.location, p.skills, p.cv_text, u.name,
+                      (SELECT COUNT(*) FROM applications a WHERE a.user_id=p.user_id) AS applied
                FROM profiles p JOIN users u ON u.id=p.user_id
-               WHERE p.skills != '[]'""").fetchall()
+               WHERE p.skills != '[]'
+                  OR p.user_id IN (SELECT user_id FROM applications)""").fetchall()
 
     results = []
     for r in rows:
@@ -1109,8 +1113,10 @@ def talents(query: str = "", job_id: Optional[int] = None,
             "candidate_id": r["user_id"], "name": r["name"],
             "title": r["title"], "location": r["location"],
             "skills": prof["skills"], "match": m,
+            "applied": r["applied"] or 0,
         })
-    results.sort(key=lambda x: x["match"]["score"], reverse=True)
+    # active applicants first, then by match score
+    results.sort(key=lambda x: (x["applied"] > 0, x["match"]["score"]), reverse=True)
     return {"count": len(results), "candidates": results}
 
 

@@ -262,7 +262,26 @@ class _CandidateCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Row(children: [
+                  Flexible(child: Text(c.name,
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                  if (c.applied > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: AppTheme.green.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(7)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.send, size: 10, color: AppTheme.green),
+                        const SizedBox(width: 3),
+                        Text(c.applied > 1 ? 'A postulé (${c.applied})' : 'A postulé',
+                            style: const TextStyle(fontSize: 10, color: AppTheme.green, fontWeight: FontWeight.w700)),
+                      ]),
+                    ),
+                  ],
+                ]),
                 Text([c.title, c.location].where((s) => s.isNotEmpty).join(' · '),
                     style: const TextStyle(color: AppTheme.muted, fontSize: 13)),
                 const SizedBox(height: 2),
