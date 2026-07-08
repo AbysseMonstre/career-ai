@@ -159,6 +159,49 @@ class Candidate {
       );
 }
 
+class Interview {
+  final int id;
+  final String candidateName;
+  final String company;
+  final String scheduledAt; // ISO datetime string
+  final String meetingType; // visio | phone | onsite
+  final String link;
+  final String location;
+  final int durationMin;
+  final String message;
+  final String status; // proposed | accepted | declined
+
+  Interview({
+    required this.id,
+    required this.candidateName,
+    required this.company,
+    required this.scheduledAt,
+    required this.meetingType,
+    required this.link,
+    required this.location,
+    required this.durationMin,
+    required this.message,
+    required this.status,
+  });
+
+  DateTime? get when => DateTime.tryParse(scheduledAt);
+
+  factory Interview.fromJson(Map<String, dynamic> j) => Interview(
+        id: j['id'] ?? 0,
+        candidateName: j['candidate_name'] ?? j['candidateName'] ?? '',
+        company: j['company'] ?? '',
+        scheduledAt: j['scheduled_at'] ?? '',
+        meetingType: (j['meeting_type'] ?? 'visio').toString(),
+        link: j['teams_link'] ?? '',
+        location: j['location'] ?? '',
+        durationMin: (j['duration_min'] ?? 30) is int
+            ? (j['duration_min'] ?? 30)
+            : int.tryParse('${j['duration_min']}') ?? 30,
+        message: j['message'] ?? '',
+        status: j['status'] ?? 'proposed',
+      );
+}
+
 class SeekerDashboard {
   final String title;
   final String location;

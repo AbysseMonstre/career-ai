@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'services/app_state.dart';
 import 'theme/app_theme.dart';
 import 'widgets/common.dart';
@@ -13,6 +14,7 @@ import 'screens/recruiter_home.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('fr_FR', null);  // locale data for the agenda/calendar
   // On web, read the backend URL from config.json so it can be changed after
   // deployment (no rebuild). Falls back to the compiled default otherwise.
   String? apiBase;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'talents_screen.dart';
+import 'agenda_screen.dart';
 import 'post_job_screen.dart';
 import 'recruiter_dashboard_screen.dart';
 
@@ -13,6 +14,7 @@ class _RecruiterHomeState extends State<RecruiterHome> {
   int _index = 0;
   final _pages = const [
     TalentsScreen(),
+    AgendaScreen(),
     PostJobScreen(),
     RecruiterDashboardScreen(),
   ];
@@ -26,6 +28,7 @@ class _RecruiterHomeState extends State<RecruiterHome> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Talents'),
+          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Agenda'),
           NavigationDestination(icon: Icon(Icons.add_box_outlined), selectedIcon: Icon(Icons.add_box), label: 'Publier'),
           NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Tableau'),
         ],

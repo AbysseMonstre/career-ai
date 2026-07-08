@@ -336,8 +336,9 @@ class FadeInItem extends StatelessWidget {
 class GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? margin;
   final VoidCallback? onTap;
-  const GlassCard({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.onTap});
+  const GlassCard({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.margin, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -357,9 +358,10 @@ class GlassCard extends StatelessWidget {
         ),
       ),
     );
-    if (onTap == null) return Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: card);
+    final outer = margin ?? const EdgeInsets.symmetric(vertical: 6);
+    if (onTap == null) return Padding(padding: outer, child: card);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: outer,
       child: InkWell(borderRadius: BorderRadius.circular(24), onTap: onTap, child: card),
     );
   }

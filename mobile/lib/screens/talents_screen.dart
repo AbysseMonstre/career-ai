@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/app_state.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import 'schedule_interview.dart';
 
 class TalentsScreen extends StatefulWidget {
   const TalentsScreen({super.key});
@@ -265,6 +265,9 @@ class _CandidateCard extends StatelessWidget {
                 Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 Text([c.title, c.location].where((s) => s.isNotEmpty).join(' · '),
                     style: const TextStyle(color: AppTheme.muted, fontSize: 13)),
+                const SizedBox(height: 2),
+                Text('${c.match.score}% de correspondance',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.violetLight, fontWeight: FontWeight.w700)),
               ]),
             ),
             MatchGauge(score: c.match.score),
@@ -273,14 +276,14 @@ class _CandidateCard extends StatelessWidget {
           SkillChips(skills: c.skills, highlight: c.match.matchedSkills),
           const SizedBox(height: 14),
           Text('${c.match.matchedSkills.length} compétences en commun',
-              style: const TextStyle(fontSize: 12, color: AppTheme.violetLight, fontWeight: FontWeight.w600)),
+              style: const TextStyle(fontSize: 12, color: AppTheme.muted, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           Row(children: [
             Expanded(
               child: FilledButton.icon(
-                onPressed: () => _inviteByEmail(context),
-                icon: const Icon(Icons.mail_outline, size: 17),
-                label: const Text('Inviter à un entretien'),
+                onPressed: () => showScheduleSheet(context, c),
+                icon: const Icon(Icons.event_available, size: 17),
+                label: const Text('Planifier un RDV'),
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 42)),
               ),
             ),
@@ -297,23 +300,5 @@ class _CandidateCard extends StatelessWidget {
         ]),
       ),
     );
-  }
-
-  // The recruiter sends the invite + Teams link themselves, from their own mailbox.
-  Future<void> _inviteByEmail(BuildContext context) async {
-    final subject = Uri.encodeComponent("Proposition d'entretien");
-    final body = Uri.encodeComponent(
-        "Bonjour ${c.name},\n\n"
-        "Votre profil${c.title.isNotEmpty ? ' de ${c.title}' : ''} nous intéresse. "
-        "Je souhaite vous proposer un entretien.\n\n"
-        "Date proposée : [à compléter]\n"
-        "Lien de la réunion Teams : [collez ici votre lien Teams]\n\n"
-        "Bien cordialement,");
-    final uri = Uri.parse('mailto:${c.email}?subject=$subject&body=$body');
-    if (!await launchUrl(uri)) {
-      if (context.mounted) {
-        showError(context, "Impossible d'ouvrir la messagerie. Email du candidat : ${c.email}");
-      }
-    }
   }
 }

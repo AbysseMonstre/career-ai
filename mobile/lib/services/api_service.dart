@@ -213,13 +213,23 @@ class ApiService {
     return Map<String, dynamic>.from(_decode(r));
   }
 
-  Future<Map<String, dynamic>> scheduleInterview(
-      int candidateId, String scheduledAt, String teamsLink, String message) async {
+  Future<Map<String, dynamic>> scheduleInterview(int candidateId,
+      {required String scheduledAt, String meetingType = 'visio', String link = '',
+      String location = '', int durationMin = 30, String message = ''}) async {
     final r = await http.post(_u('/recruiter/interview'),
         headers: _headers,
-        body: jsonEncode({'candidate_id': candidateId, 'scheduled_at': scheduledAt,
-            'teams_link': teamsLink, 'message': message}));
+        body: jsonEncode({
+          'candidate_id': candidateId, 'scheduled_at': scheduledAt,
+          'teams_link': link, 'meeting_type': meetingType, 'location': location,
+          'duration_min': durationMin, 'message': message,
+        }));
     return Map<String, dynamic>.from(_decode(r));
+  }
+
+  Future<List<Interview>> recruiterInterviews() async {
+    final r = await http.get(_u('/recruiter/interviews'), headers: _headers);
+    final j = _decode(r);
+    return (j['interviews'] as List).map((e) => Interview.fromJson(e)).toList();
   }
 
   Future<List<Map<String, dynamic>>> myInterviews() async {

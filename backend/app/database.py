@@ -42,14 +42,17 @@ CREATE TABLE IF NOT EXISTS contact_requests (
     created_at  TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
--- Interview a recruiter schedules with a chosen candidate (Teams link).
+-- Interview a recruiter schedules with a chosen candidate.
 CREATE TABLE IF NOT EXISTS interviews (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     recruiter_id  INTEGER NOT NULL REFERENCES users(id),
     candidate_id  INTEGER NOT NULL REFERENCES users(id),
     company       TEXT DEFAULT '',
     scheduled_at  TEXT DEFAULT '',          -- ISO datetime chosen by the recruiter
-    teams_link    TEXT DEFAULT '',
+    teams_link    TEXT DEFAULT '',          -- meeting link (visio)
+    meeting_type  TEXT DEFAULT 'visio',     -- visio | phone | onsite
+    location      TEXT DEFAULT '',          -- address (onsite) or phone number
+    duration_min  INTEGER DEFAULT 30,
     message       TEXT DEFAULT '',
     status        TEXT NOT NULL DEFAULT 'proposed',  -- proposed | accepted | declined
     created_at    TEXT DEFAULT CURRENT_TIMESTAMP
@@ -138,6 +141,9 @@ _MIGRATIONS = [
     ("users", "talent_access", "ALTER TABLE users ADD COLUMN talent_access TEXT DEFAULT 'none'"),
     ("users", "consent_at", "ALTER TABLE users ADD COLUMN consent_at TEXT"),
     ("applications", "cover_letter", "ALTER TABLE applications ADD COLUMN cover_letter TEXT DEFAULT ''"),
+    ("interviews", "meeting_type", "ALTER TABLE interviews ADD COLUMN meeting_type TEXT DEFAULT 'visio'"),
+    ("interviews", "location", "ALTER TABLE interviews ADD COLUMN location TEXT DEFAULT ''"),
+    ("interviews", "duration_min", "ALTER TABLE interviews ADD COLUMN duration_min INTEGER DEFAULT 30"),
 ]
 
 # ---------------------------------------------------------------------------

@@ -1157,6 +1157,9 @@ class InterviewIn(BaseModel):
     candidate_id: int
     scheduled_at: str = ""
     teams_link: str = ""
+    meeting_type: str = "visio"   # visio | phone | onsite
+    location: str = ""            # address (onsite) or phone number
+    duration_min: int = 30
     message: str = ""
 
 
@@ -1176,10 +1179,12 @@ def schedule_interview(body: InterviewIn, background: BackgroundTasks,
             (user["id"],)).fetchone()
         company = (cr["company"] if cr else "") or user["name"]
         conn.execute(
-            """INSERT INTO interviews (recruiter_id, candidate_id, company, scheduled_at, teams_link, message)
-               VALUES (?,?,?,?,?,?)""",
+            """INSERT INTO interviews (recruiter_id, candidate_id, company, scheduled_at,
+                   teams_link, meeting_type, location, duration_min, message)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
             (user["id"], body.candidate_id, company, body.scheduled_at.strip(),
-             body.teams_link.strip(), body.message.strip()))
+             body.teams_link.strip(), (body.meeting_type or "visio").strip(),
+             body.location.strip(), int(body.duration_min or 30), body.message.strip()))
     background.add_task(
         notifications.send_interview_invite,
         to_email=cand["email"], candidate_name=cand["name"], company=company,
