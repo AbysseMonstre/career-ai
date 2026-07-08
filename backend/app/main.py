@@ -68,8 +68,12 @@ def _startup():
     log.info("Career AI démarré (env=%s, sources=%d)", config.ENV, 7)
     from . import maintenance
     maintenance.purge_expired()  # cheap, no network
-    if config.SCHEDULER_ENABLED:
+    # In the cloud (public URL known) or when explicitly enabled: keep offers
+    # fresh in the background and self-ping so the free instance never sleeps.
+    if config.SCHEDULER_ENABLED or config.PUBLIC_URL:
         maintenance.start(config.REFRESH_EVERY_SEC)
+    if config.PUBLIC_URL:
+        maintenance.start_keepalive(config.PUBLIC_URL, config.KEEPALIVE_EVERY_SEC)
 
 
 # ---------- auth dependency ----------

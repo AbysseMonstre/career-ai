@@ -34,6 +34,13 @@ MIN_PASSWORD_LEN = 8
 SCHEDULER_ENABLED = os.environ.get("CAREER_AI_SCHEDULER", "0") == "1"
 REFRESH_EVERY_SEC = int(os.environ.get("CAREER_AI_REFRESH_SEC", str(6 * 3600)))
 
+# Public URL of this backend. On Render it's provided automatically as
+# RENDER_EXTERNAL_URL — used for the keep-alive self-ping (so the free instance
+# never sleeps) and to auto-enable the scheduler when running in the cloud.
+PUBLIC_URL = (os.environ.get("CAREER_AI_PUBLIC_URL")
+              or os.environ.get("RENDER_EXTERNAL_URL") or "").rstrip("/")
+KEEPALIVE_EVERY_SEC = int(os.environ.get("CAREER_AI_KEEPALIVE_SEC", "600"))  # 10 min < Render's 15
+
 
 def validate_startup():
     """Fail fast in production if dangerous defaults are still in place."""

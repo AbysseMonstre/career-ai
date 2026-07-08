@@ -54,3 +54,25 @@ def start(refresh_every_sec: int = 6 * 3600):
     t.start()
     print(f"[maintenance] purge + refresh planifiés toutes les {refresh_every_sec // 3600} h")
     return t
+
+
+def _keepalive_worker(url: str, every_sec: int):
+    import requests
+    ping = url.rstrip("/") + "/"
+    # small initial delay so we don't ping during boot
+    time.sleep(min(every_sec, 60))
+    while True:
+        try:
+            requests.get(ping, timeout=20)
+        except Exception as e:
+            print(f"[keepalive] ping échoué: {e}")
+        time.sleep(every_sec)
+
+
+def start_keepalive(url: str, every_sec: int = 600):
+    """Self-ping the public URL periodically so a free host never idles to sleep."""
+    t = threading.Thread(target=_keepalive_worker, args=(url, every_sec), daemon=True)
+    t.start()
+    print(f"[keepalive] auto-ping de {url} toutes les {every_sec // 60} min")
+    return t
+    return t
