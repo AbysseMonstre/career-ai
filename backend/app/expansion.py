@@ -43,7 +43,7 @@ _SYN = {
     "aéronautique": ["aeronautique", "aviation", "aerospace", "aéronef"],
     "aeronautique": ["aéronautique", "aviation", "aerospace"],
     "mécanicien": ["mecanicien", "mécanique", "technicien mécanique", "mechanic"],
-    "maçon": ["macon", "maçonnerie", "gros œuvre", "btp"],
+    "maçon": ["macon", "maçonnerie", "gros œuvre", "chantier"],
     "électricien": ["electricien", "électricité", "electrical"],
     "plombier": ["plomberie", "chauffagiste"],
     "chauffeur": ["conducteur", "livreur", "routier", "driver"],
@@ -55,8 +55,8 @@ _SYN = {
     "sécurité": ["agent de sécurité", "gardien", "vigile", "security"],
     "réceptionniste": ["réception", "front desk", "accueil"],
     "caissier": ["caissière", "hôte de caisse", "encaissement"],
-    "btp": ["bâtiment", "construction", "gros œuvre", "chantier"],
-    "industrie": ["production", "usine", "manufacturing", "maintenance industrielle"],
+    "bâtiment": ["construction", "gros œuvre", "chantier", "maçon"],
+    "industrie": ["production", "usine", "maintenance industrielle"],
 }
 
 
