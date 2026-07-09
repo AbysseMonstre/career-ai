@@ -1,9 +1,22 @@
 """Fan out across every source in parallel, normalize, dedupe, persist."""
 import json
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .sources import ALL_SCRAPERS
 from ..database import get_conn
+
+
+def unaccent(s: str) -> str:
+    """Lowercase + strip accents (for accent-insensitive search)."""
+    return "".join(c for c in unicodedata.normalize("NFD", (s or "").lower())
+                   if unicodedata.category(c) != "Mn")
+
+
+def search_text_for(row: dict) -> str:
+    """Small, accent-stripped blob used for fast SQL search (title+company+tags)."""
+    tags = " ".join(str(t) for t in (row.get("tags") or []))
+    return unaccent(f"{row.get('title','')} {row.get('company','')} {tags}")
 
 # Training providers / schools that advertise "formations" instead of real jobs.
 _FORMATION_COMPANY = [
@@ -113,12 +126,13 @@ def _upsert(jobs: list):
         for j in jobs:
             conn.execute(
                 """INSERT INTO jobs (source, ext_id, title, company, location, url,
-                       description, tags, salary, posted_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)
+                       description, tags, salary, posted_at, search_text)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(source, ext_id) DO UPDATE SET
                        title=excluded.title, description=excluded.description,
-                       tags=excluded.tags, fetched_at=CURRENT_TIMESTAMP""",
+                       tags=excluded.tags, search_text=excluded.search_text,
+                       fetched_at=CURRENT_TIMESTAMP""",
                 (j["source"], j["ext_id"], j["title"], j["company"], j["location"],
                  j["url"], j["description"], json.dumps(j["tags"]), j["salary"],
-                 j["posted_at"]),
+                 j["posted_at"], search_text_for(j)),
             )

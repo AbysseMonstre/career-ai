@@ -76,6 +76,7 @@ def _startup():
     log.info("Career AI démarré (env=%s, sources=%d)", config.ENV, 7)
     from . import maintenance
     maintenance.purge_expired()  # cheap, no network
+    maintenance.start_backfill()  # one-time: fill search_text for pre-existing rows
     # In the cloud (public URL known) or when explicitly enabled: keep offers
     # fresh in the background and self-ping so the free instance never sleeps.
     if config.SCHEDULER_ENABLED or config.PUBLIC_URL:
@@ -537,19 +538,8 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
         for q in alt_queries[:9]:
             scrape_all(q, location)
 
-    # Query matching is done in Python so it is ACCENT-INSENSITIVE (e.g. searching
-    # "developpeur" matches "développeur"). Location stays in SQL.
-    def build():
-        sql = "SELECT * FROM jobs WHERE 1=1"
-        args = []
-        if location:
-            sql += (" AND (LOWER(location) LIKE ? OR LOWER(location) LIKE '%remote%'"
-                    " OR LOWER(location) LIKE '%anywhere%' OR LOWER(location) LIKE '%worldwide%'"
-                    " OR LOWER(location) LIKE '%télétravail%')")
-            args.append(f"%{location.lower()}%")
-        sql += " ORDER BY fetched_at DESC"
-        return sql, args
-
+    # Accent-insensitive query terms, matched in SQL against the precomputed
+    # `search_text` column (fast, scales to a huge DB). "developpeur" == "développeur".
     _qterms = []
     if query:
         for v in variants:
@@ -557,21 +547,32 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
             if ws:
                 _qterms.append(ws)
 
-    def _apply_query(rows):
-        if not _qterms:
-            return rows
-        def _m(j):
-            blob = _unaccent((j.get("title", "") + " " + j.get("description", "") + " "
-                              + " ".join(str(t) for t in (j.get("tags") or []))).lower())
-            return any(all(w in blob for w in ws) for ws in _qterms)
-        return [j for j in rows if _m(j)]
+    def build():
+        sql = "SELECT * FROM jobs WHERE 1=1"
+        args = []
+        if _qterms:
+            ors = []
+            for ws in _qterms:
+                conds = []
+                for w in ws:
+                    conds.append("search_text LIKE ?")
+                    args.append(f"%{w}%")
+                ors.append("(" + " AND ".join(conds) + ")")
+            sql += " AND (" + " OR ".join(ors) + ")"
+        if location:
+            sql += (" AND (LOWER(location) LIKE ? OR LOWER(location) LIKE '%remote%'"
+                    " OR LOWER(location) LIKE '%anywhere%' OR LOWER(location) LIKE '%worldwide%'"
+                    " OR LOWER(location) LIKE '%télétravail%')")
+            args.append(f"%{location.lower()}%")
+        sql += " ORDER BY fetched_at DESC LIMIT 1500"
+        return sql, args
 
     with get_conn() as conn:
         profile = _profile(conn, user["id"]) if is_seeker else None
         favs = {r["job_id"] for r in conn.execute(
             "SELECT job_id FROM favorites WHERE user_id=?", (user["id"],)).fetchall()}
         sql, args = build()
-        rows = _apply_query([_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()])
+        rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
         # self-populate when empty (e.g. fresh/ephemeral DB) — even with no query,
         # scrape a default set so the feed is never empty on first load.
         if not rows and not favorites_only:
@@ -591,7 +592,7 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
             for v in populate:
                 scrape_all(v, location)
             sql, args = build()
-            rows = _apply_query([_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()])
+            rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
 
     def _recent(j):
         age = _job_age_days(j)

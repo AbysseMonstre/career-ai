@@ -94,6 +94,41 @@ def _send_alerts():
             conn.execute("UPDATE users SET alerts_sent_at=? WHERE id=?", (today, u["id"]))
 
 
+def backfill_search_text(batch: int = 400):
+    """Fill search_text for existing jobs that predate the column (one pass)."""
+    import json
+    from .database import get_conn
+    from .scrapers.aggregator import unaccent
+    done = 0
+    while True:
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT id, title, company, tags FROM jobs WHERE search_text='' LIMIT ?",
+                (batch,)).fetchall()
+            if not rows:
+                break
+            for r in rows:
+                tags = " ".join(str(t) for t in json.loads(r["tags"] or "[]"))
+                st = unaccent(f"{r['title']} {r['company']} {tags}")
+                conn.execute("UPDATE jobs SET search_text=? WHERE id=?", (st, r["id"]))
+        done += len(rows)
+    if done:
+        print(f"[maintenance] backfill search_text: {done} offres mises à jour")
+
+
+def start_backfill():
+    t = threading.Thread(target=lambda: _safe(backfill_search_text), daemon=True)
+    t.start()
+    return t
+
+
+def _safe(fn):
+    try:
+        fn()
+    except Exception as e:
+        print(f"[maintenance] {fn.__name__} échoué: {e}")
+
+
 def _worker(refresh_every_sec: int):
     while True:
         try:

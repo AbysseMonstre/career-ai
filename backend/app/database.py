@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     posted_at   TEXT DEFAULT '',
     fetched_at  TEXT DEFAULT CURRENT_TIMESTAMP,
     recruiter_id INTEGER,                 -- set when posted by a recruiter
+    search_text TEXT DEFAULT '',          -- accent-stripped lowercased title+company+tags for fast search
     UNIQUE(source, ext_id)
 );
 
@@ -148,6 +149,7 @@ _MIGRATIONS = [
     ("interviews", "duration_min", "ALTER TABLE interviews ADD COLUMN duration_min INTEGER DEFAULT 30"),
     ("users", "alerts_enabled", "ALTER TABLE users ADD COLUMN alerts_enabled INTEGER DEFAULT 0"),
     ("users", "alerts_sent_at", "ALTER TABLE users ADD COLUMN alerts_sent_at TEXT DEFAULT ''"),
+    ("jobs", "search_text", "ALTER TABLE jobs ADD COLUMN search_text TEXT DEFAULT ''"),
 ]
 
 # ---------------------------------------------------------------------------
