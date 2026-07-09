@@ -256,6 +256,18 @@ def init_db():
                     (table, column)).fetchone()
                 if not exists:
                     conn.execute(ddl)  # ALTER TABLE ... ADD COLUMN (valid in PG)
+            # Performance indexes so search stays instant on a huge DB:
+            # a trigram GIN index makes LIKE '%term%' fast; a fetched_at index
+            # speeds the ORDER BY. IF NOT EXISTS -> built once.
+            for idx in (
+                "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+                "CREATE INDEX IF NOT EXISTS jobs_search_trgm ON jobs USING gin (search_text gin_trgm_ops)",
+                "CREATE INDEX IF NOT EXISTS jobs_fetched_idx ON jobs (fetched_at)",
+            ):
+                try:
+                    conn.execute(idx)
+                except Exception as e:
+                    print(f"[db] index skipped: {e}")
         else:
             conn.executescript(SCHEMA)
             for table, column, ddl in _MIGRATIONS:
