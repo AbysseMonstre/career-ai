@@ -526,7 +526,8 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
                     seen.add(v.lower())
                     scrape_all(v, location)
     elif sync:
-        for v in variants:
+        # light live refresh: only the main query (the DB is kept full by warm queries)
+        for v in variants[:1]:
             scrape_all(v, location)
 
     # Alternance mode: aggressively scrape work-study offers across popular
@@ -573,9 +574,11 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
             "SELECT job_id FROM favorites WHERE user_id=?", (user["id"],)).fetchall()}
         sql, args = build()
         rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
-        # self-populate when empty (e.g. fresh/ephemeral DB) — even with no query,
-        # scrape a default set so the feed is never empty on first load.
-        if not rows and not favorites_only:
+        # Self-populate ONLY when the DB is basically empty (fresh/ephemeral) — never
+        # scrape live just because one query has no match, otherwise every rare search
+        # would trigger a heavy live scrape. A rich DB is kept fresh by warm queries.
+        total_jobs = conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"]
+        if not rows and not favorites_only and total_jobs < 300:
             if alternance:
                 base = query.strip()
                 populate = ([base] if base else []) + ["alternance"] \
