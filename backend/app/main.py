@@ -289,6 +289,32 @@ def me(user: dict = Depends(current_user)):
     return user
 
 
+@app.get("/debug/sources")
+def debug_sources(user: dict = Depends(current_user)):
+    """Diagnose which optional sources Render actually sees + a live fetch count."""
+    import os as _os
+    from .scrapers.sources import FranceTravail, Adzuna
+    out = {
+        "francetravail_configured": bool(_os.environ.get("FT_CLIENT_ID") and _os.environ.get("FT_CLIENT_SECRET")),
+        "adzuna_configured": bool(_os.environ.get("ADZUNA_APP_ID") and _os.environ.get("ADZUNA_APP_KEY")),
+        "rapidapi_configured": bool(_os.environ.get("RAPIDAPI_KEY")),
+        "ai_configured": ai.available(),
+        "ft_id_len": len(_os.environ.get("FT_CLIENT_ID", "")),
+        "ft_secret_len": len(_os.environ.get("FT_CLIENT_SECRET", "")),
+        "adzuna_id_len": len(_os.environ.get("ADZUNA_APP_ID", "")),
+        "adzuna_key_len": len(_os.environ.get("ADZUNA_APP_KEY", "")),
+    }
+    try:
+        out["francetravail_live"] = len(FranceTravail().fetch("developpeur"))
+    except Exception as e:
+        out["francetravail_live_error"] = str(e)[:120]
+    try:
+        out["adzuna_live"] = len(Adzuna().fetch("developer"))
+    except Exception as e:
+        out["adzuna_live_error"] = str(e)[:120]
+    return out
+
+
 class AlertsIn(BaseModel):
     enabled: bool
 
