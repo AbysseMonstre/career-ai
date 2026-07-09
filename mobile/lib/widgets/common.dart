@@ -186,6 +186,62 @@ class DeleteAccountButton extends StatelessWidget {
   }
 }
 
+/// Opt-in toggle for email alerts of new matching offers (seeker).
+class AlertsToggle extends StatefulWidget {
+  const AlertsToggle({super.key});
+  @override
+  State<AlertsToggle> createState() => _AlertsToggleState();
+}
+
+class _AlertsToggleState extends State<AlertsToggle> {
+  bool _on = false;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final v = await context.read<AppState>().api.getAlerts();
+      if (mounted) setState(() { _on = v; _loaded = true; });
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  Future<void> _toggle(bool v) async {
+    setState(() => _on = v);
+    try {
+      await context.read<AppState>().api.setAlerts(v);
+      if (mounted) showOk(context, v ? 'Alertes email activées' : 'Alertes email désactivées');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _on = !v);
+        showError(context, e);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: SwitchListTile(
+        value: _on,
+        onChanged: _loaded ? _toggle : null,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+        title: const Text('Alertes email', style: TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: const Text('Recevez par email les nouvelles offres qui correspondent à votre profil.',
+            style: TextStyle(color: AppTheme.muted, fontSize: 12)),
+        secondary: const Icon(Icons.notifications_active_outlined, color: AppTheme.violetLight),
+      ),
+    );
+  }
+}
+
 /// Link to the legal / privacy page.
 class LegalLink extends StatelessWidget {
   const LegalLink({super.key});

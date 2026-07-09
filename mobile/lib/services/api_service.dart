@@ -76,6 +76,38 @@ class ApiService {
     return AuthResult(j['token'], AppUser.fromJson(j['user']));
   }
 
+  Future<void> forgotPassword(String email) async {
+    _decode(await http.post(_u('/auth/forgot-password'),
+        headers: _headers, body: jsonEncode({'email': email})));
+  }
+
+  /// Returns the new session token on success.
+  Future<String> resetPassword(String token, String password) async {
+    final r = await http.post(_u('/auth/reset-password'),
+        headers: _headers, body: jsonEncode({'token': token, 'password': password}));
+    return _decode(r)['token'] as String;
+  }
+
+  Future<bool> getAlerts() async {
+    final r = await http.get(_u('/me/alerts'), headers: _headers);
+    return _decode(r)['enabled'] == true;
+  }
+
+  Future<bool> setAlerts(bool enabled) async {
+    final r = await http.post(_u('/me/alerts'),
+        headers: _headers, body: jsonEncode({'enabled': enabled}));
+    return _decode(r)['enabled'] == true;
+  }
+
+  Future<String> matchExplain(int jobId) async {
+    final r = await http.post(_u('/match/explain'),
+        headers: _headers, body: jsonEncode({'job_id': jobId}));
+    return _decode(r)['explanation'] as String? ?? '';
+  }
+
+  bool get aiMatchAvailable => _aiAvailable;
+  bool _aiAvailable = false; // set from the /jobs response (ai_enabled)
+
   // ---------- CV ----------
   Future<Map<String, dynamic>> uploadCvText(String text, {String? title, String? location}) async {
     final req = http.MultipartRequest('POST', _u('/cv/upload'));
@@ -118,6 +150,7 @@ class ApiService {
         }),
         headers: _headers);
     final j = _decode(r);
+    _aiAvailable = j['ai_enabled'] == true;
     return (j['jobs'] as List).map((e) => Job.fromJson(e)).toList();
   }
 

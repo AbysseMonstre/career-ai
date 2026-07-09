@@ -112,6 +112,8 @@ class _SeekerDashboardScreenState extends State<SeekerDashboardScreen> {
               ]),
             ),
           ),
+          const SizedBox(height: 8),
+          const AlertsToggle(),
           const SizedBox(height: 24),
           const DeleteAccountButton(),
           const LegalLink(),

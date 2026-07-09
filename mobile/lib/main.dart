@@ -8,6 +8,7 @@ import 'services/app_state.dart';
 import 'theme/app_theme.dart';
 import 'widgets/common.dart';
 import 'screens/auth_screen.dart';
+import 'screens/reset_password_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/seeker_home.dart';
 import 'screens/recruiter_home.dart';
@@ -27,9 +28,11 @@ Future<void> main() async {
       }
     } catch (_) {/* use default */}
   }
+  // Password-reset deep link: https://…/?reset=<token>
+  final resetToken = kIsWeb ? Uri.base.queryParameters['reset'] : null;
   runApp(
     ChangeNotifierProvider(
-      create: (_) => AppState(apiBaseUrl: apiBase)..bootstrap(),
+      create: (_) => AppState(apiBaseUrl: apiBase, resetToken: resetToken)..bootstrap(),
       child: const CareerAIApp(),
     ),
   );
@@ -57,6 +60,7 @@ class _Root extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     if (state.loading) return const _Splash();
+    if (state.resetToken != null) return ResetPasswordScreen(token: state.resetToken!);
     if (!state.onboarded) return const OnboardingScreen();
     if (!state.isLoggedIn) return const AuthScreen();
     return state.user!.isRecruiter ? const RecruiterHome() : const SeekerHome();

@@ -21,7 +21,7 @@ from starlette.responses import Response
 from pydantic import BaseModel
 
 from .database import get_conn, init_db
-from . import security, cv_parser, matching, notifications, config, cover_letter, expansion
+from . import security, cv_parser, matching, notifications, config, cover_letter, expansion, ai
 from .scrapers import scrape_all
 from .scrapers.aggregator import _is_junk, _is_formation_ad
 
@@ -89,7 +89,7 @@ def current_user(authorization: Optional[str] = Header(None)) -> dict:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing bearer token")
     payload = security.decode_token(authorization[7:])
-    if not payload:
+    if not payload or payload.get("typ") == "reset":
         raise HTTPException(401, "Invalid or expired token")
     with get_conn() as conn:
         row = conn.execute("SELECT id, email, role, name FROM users WHERE id=?",
@@ -240,9 +240,90 @@ def login(body: LoginIn, request: Request):
                                      "name": row["name"], "role": row["role"]}}
 
 
+class ForgotIn(BaseModel):
+    email: str
+
+
+class ResetIn(BaseModel):
+    token: str
+    password: str
+
+
+@app.post("/auth/forgot-password")
+def forgot_password(body: ForgotIn, request: Request, background: BackgroundTasks):
+    """Email a reset link. Always returns success (never reveals if the email exists)."""
+    if security.rate_limited(_client_key(request, "forgot"), limit=5, window_sec=3600):
+        raise HTTPException(429, "Trop de demandes. Réessayez plus tard.")
+    generic = {"status": "ok",
+               "message": "Si un compte existe pour cet email, un lien de réinitialisation a été envoyé."}
+    if not _EMAIL_RE.match(body.email or ""):
+        return generic
+    with get_conn() as conn:
+        row = conn.execute("SELECT id, email FROM users WHERE email=?", (body.email,)).fetchone()
+    if row:
+        token = security.create_reset_token(row["id"])
+        link = f"{config.FRONTEND_URL}/?reset={token}"
+        background.add_task(notifications.send_password_reset, to_email=row["email"], reset_link=link)
+    return generic
+
+
+@app.post("/auth/reset-password")
+def reset_password(body: ResetIn):
+    uid = security.verify_reset_token(body.token)
+    if not uid:
+        raise HTTPException(400, "Lien invalide ou expiré. Refaites une demande.")
+    if len(body.password) < config.MIN_PASSWORD_LEN:
+        raise HTTPException(400, f"Mot de passe trop court (min {config.MIN_PASSWORD_LEN} caractères)")
+    with get_conn() as conn:
+        row = conn.execute("SELECT id, role FROM users WHERE id=?", (uid,)).fetchone()
+        if not row:
+            raise HTTPException(400, "Compte introuvable")
+        conn.execute("UPDATE users SET password=? WHERE id=?",
+                     (security.hash_password(body.password), uid))
+    token = security.create_token(row["id"], row["role"])
+    return {"status": "ok", "token": token, "message": "Mot de passe réinitialisé."}
+
+
 @app.get("/me")
 def me(user: dict = Depends(current_user)):
     return user
+
+
+class AlertsIn(BaseModel):
+    enabled: bool
+
+
+@app.get("/me/alerts")
+def get_alerts(user: dict = Depends(require_role("seeker"))):
+    with get_conn() as conn:
+        row = conn.execute("SELECT alerts_enabled FROM users WHERE id=?", (user["id"],)).fetchone()
+    return {"enabled": bool(row["alerts_enabled"]) if row else False}
+
+
+@app.post("/me/alerts")
+def set_alerts(body: AlertsIn, user: dict = Depends(require_role("seeker"))):
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET alerts_enabled=? WHERE id=?",
+                     (1 if body.enabled else 0, user["id"]))
+    return {"enabled": body.enabled}
+
+
+class ExplainIn(BaseModel):
+    job_id: int
+
+
+@app.post("/match/explain")
+def match_explain(body: ExplainIn, user: dict = Depends(require_role("seeker"))):
+    """AI explanation of why an offer fits the candidate. Requires an API key."""
+    if not ai.available():
+        raise HTTPException(503, "Matching IA non activé sur ce serveur.")
+    with get_conn() as conn:
+        prof = _profile(conn, user["id"])
+        jrow = conn.execute("SELECT * FROM jobs WHERE id=?", (body.job_id,)).fetchone()
+    if not jrow:
+        raise HTTPException(404, "Offre introuvable")
+    text = ai.explain_match(prof, _job_row_to_dict(jrow))
+    return {"explanation": text or "Explication indisponible pour le moment."}
 
 
 # ---------- RGPD: portability, erasure, transparency ----------
@@ -527,7 +608,7 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
         rows.sort(key=lambda x: x.get("fetched_at", ""), reverse=True)
     elif profile is not None:
         rows.sort(key=lambda x: x["match"]["score"], reverse=True)
-    return {"count": len(rows[:limit]), "jobs": rows[:limit]}
+    return {"count": len(rows[:limit]), "jobs": rows[:limit], "ai_enabled": ai.available()}
 
 
 # ---------- interview / pitch training (persuasiv-inspired, keyless) ----------

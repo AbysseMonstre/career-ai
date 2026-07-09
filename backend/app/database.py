@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS users (
     name          TEXT NOT NULL,
     talent_access TEXT DEFAULT 'none',    -- recruiter: none | pending | granted
     consent_at    TEXT,                   -- RGPD: when data-processing consent was given
+    alerts_enabled INTEGER DEFAULT 0,     -- seeker opted in to email job alerts
+    alerts_sent_at TEXT DEFAULT '',       -- last time a digest was sent
     created_at    TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -144,6 +146,8 @@ _MIGRATIONS = [
     ("interviews", "meeting_type", "ALTER TABLE interviews ADD COLUMN meeting_type TEXT DEFAULT 'visio'"),
     ("interviews", "location", "ALTER TABLE interviews ADD COLUMN location TEXT DEFAULT ''"),
     ("interviews", "duration_min", "ALTER TABLE interviews ADD COLUMN duration_min INTEGER DEFAULT 30"),
+    ("users", "alerts_enabled", "ALTER TABLE users ADD COLUMN alerts_enabled INTEGER DEFAULT 0"),
+    ("users", "alerts_sent_at", "ALTER TABLE users ADD COLUMN alerts_sent_at TEXT DEFAULT ''"),
 ]
 
 # ---------------------------------------------------------------------------

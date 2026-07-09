@@ -87,6 +87,37 @@ def send_interview_invite(*, to_email: str, candidate_name: str, company: str,
     return _send(subject, body, to=to_email)
 
 
+def send_password_reset(*, to_email: str, reset_link: str) -> bool:
+    subject = "[Career AI] Réinitialisation de votre mot de passe"
+    body = (
+        "Bonjour,\n\n"
+        "Vous avez demandé à réinitialiser votre mot de passe Career AI.\n"
+        "Cliquez sur le lien ci-dessous (valable 1 heure) :\n\n"
+        f"{reset_link}\n\n"
+        "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — "
+        "votre mot de passe reste inchangé."
+    )
+    return _send(subject, body, to=to_email)
+
+
+def send_job_alert(*, to_email: str, name: str, jobs: list) -> bool:
+    """Digest of top matching offers for a candidate who opted in to alerts."""
+    lines = []
+    for j in jobs:
+        score = (j.get("match") or {}).get("score", 0)
+        lines.append(f"  • {j.get('title','')} — {j.get('company','')} "
+                     f"({score}% de correspondance)\n    {j.get('url','')}")
+    subject = f"[Career AI] {len(jobs)} offres pour votre profil"
+    body = (
+        f"Bonjour {name},\n\n"
+        "Voici les offres les plus pertinentes pour votre profil :\n\n"
+        + "\n".join(lines)
+        + "\n\nRetrouvez-les dans l'application Career AI.\n"
+        "Pour ne plus recevoir ces alertes, désactivez-les dans votre tableau de bord."
+    )
+    return _send(subject, body, to=to_email)
+
+
 def _send(subject: str, body: str, to: str = None) -> bool:
     recipient = to or ADMIN_EMAIL
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):

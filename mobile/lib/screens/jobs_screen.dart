@@ -639,6 +639,34 @@ class _JobCard extends StatelessWidget {
     );
   }
 
+  void _explainMatch(BuildContext context, Job job) {
+    final future = context.read<AppState>().api.matchExplain(job.id);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.sheet,
+        title: const Row(children: [
+          Icon(Icons.auto_awesome, color: AppTheme.violetLight),
+          SizedBox(width: 8),
+          Text('Analyse IA'),
+        ]),
+        content: FutureBuilder<String>(
+          future: future,
+          builder: (c, snap) {
+            if (snap.connectionState != ConnectionState.done) {
+              return const SizedBox(height: 64, child: Center(child: CircularProgressIndicator()));
+            }
+            return Text(
+              snap.hasError ? "Analyse IA indisponible pour le moment." : (snap.data ?? ''),
+              style: const TextStyle(height: 1.5),
+            );
+          },
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer'))],
+      ),
+    );
+  }
+
   void _showDetail(BuildContext context) {
     final loc = job.location.toLowerCase();
     final isRemote = loc.contains('remote') || loc.contains('télétravail') ||
@@ -751,6 +779,17 @@ class _JobCard extends StatelessWidget {
                                   : job.description,
                               style: const TextStyle(height: 1.55, color: Color(0xFFD8D4EA))),
                         ),
+                        if (job.match != null &&
+                            context.read<AppState>().api.aiMatchAvailable)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: OutlinedButton.icon(
+                              onPressed: () => _explainMatch(context, job),
+                              icon: const Icon(Icons.auto_awesome, size: 16),
+                              label: const Text('Pourquoi ce match ? (IA)'),
+                              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                            ),
+                          ),
                       ]),
                     ),
                   ],

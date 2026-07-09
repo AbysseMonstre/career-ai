@@ -34,6 +34,15 @@ MIN_PASSWORD_LEN = 8
 # are never exposed — recruiters contact/schedule through the platform.
 OPEN_TALENTS = os.environ.get("CAREER_AI_OPEN_TALENTS", "1") == "1"
 
+# Public frontend URL (for password-reset links). Default: the GitHub Pages app.
+FRONTEND_URL = os.environ.get(
+    "CAREER_AI_FRONTEND_URL", "https://abyssemonstre.github.io/career-ai/").rstrip("/")
+
+# Optional AI matching (Anthropic). When set, /match/explain returns an LLM
+# explanation of why a candidate/offer fits.
+ANTHROPIC_API_KEY = os.environ.get("CAREER_AI_ANTHROPIC_KEY", "")
+ANTHROPIC_MODEL = os.environ.get("CAREER_AI_ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+
 # --- background scheduler (periodic scrape + purge) ---
 SCHEDULER_ENABLED = os.environ.get("CAREER_AI_SCHEDULER", "0") == "1"
 REFRESH_EVERY_SEC = int(os.environ.get("CAREER_AI_REFRESH_SEC", str(6 * 3600)))

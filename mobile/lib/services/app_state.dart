@@ -10,12 +10,20 @@ class AppState extends ChangeNotifier {
   bool loading = true;
   bool onboarded = true;
 
-  AppState({String? apiBaseUrl}) : api = ApiService(baseUrl: apiBaseUrl) {
+  /// Set from a `?reset=<token>` URL — shows the reset-password screen.
+  String? resetToken;
+
+  AppState({String? apiBaseUrl, this.resetToken}) : api = ApiService(baseUrl: apiBaseUrl) {
     // When the server rejects a stored token, log out so the UI returns to the
     // auth screen instead of showing "invalid or expired token" on every action.
     api.onUnauthorized = () {
       if (user != null) logout();
     };
+  }
+
+  void clearReset() {
+    resetToken = null;
+    notifyListeners();
   }
 
   bool get isLoggedIn => user != null;

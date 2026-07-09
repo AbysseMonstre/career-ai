@@ -41,6 +41,40 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _forgotPassword() async {
+    final ctrl = TextEditingController(text: _email.text.trim());
+    final send = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.sheet,
+        title: const Text('Mot de passe oublié'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Entrez votre email — nous vous enverrons un lien de réinitialisation.',
+              style: TextStyle(color: AppTheme.muted, fontSize: 13)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Email'),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Envoyer')),
+        ],
+      ),
+    );
+    if (send != true || !mounted) return;
+    try {
+      await context.read<AppState>().api.forgotPassword(ctrl.text.trim());
+      if (mounted) {
+        showOk(context, 'Si un compte existe, un email de réinitialisation a été envoyé.');
+      }
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,6 +158,12 @@ class _AuthScreenState extends State<AuthScreen> {
                 onPressed: () => setState(() => _isLogin = !_isLogin),
                 child: Text(_isLogin ? "Pas de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'),
               ),
+              if (_isLogin)
+                TextButton(
+                  onPressed: _busy ? null : _forgotPassword,
+                  child: const Text('Mot de passe oublié ?',
+                      style: TextStyle(color: AppTheme.muted, fontSize: 13)),
+                ),
             ],
           ),
         ),

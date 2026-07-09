@@ -38,11 +38,48 @@ def _refresh_jobs():
             print(f"[maintenance] refresh '{q}' a échoué: {e}")
 
 
+def _send_alerts():
+    """Email a digest of top matching offers to seekers who opted in (once/day)."""
+    import json
+    from datetime import datetime, timezone
+    from . import notifications, matching
+    from .database import get_conn
+    if not (notifications.SMTP_HOST and notifications.SMTP_USER and notifications.SMTP_PASSWORD):
+        return  # email not configured -> skip silently
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        users = conn.execute(
+            "SELECT u.id, u.email, u.name, p.title, p.location, p.skills "
+            "FROM users u JOIN profiles p ON p.user_id=u.id "
+            "WHERE u.alerts_enabled=1 AND p.skills != '[]' "
+            "AND (u.alerts_sent_at IS NULL OR u.alerts_sent_at < ?)", (today,)).fetchall()
+        jobs = [dict(r) for r in conn.execute(
+            "SELECT * FROM jobs ORDER BY fetched_at DESC LIMIT 400").fetchall()]
+    for j in jobs:
+        j["tags"] = json.loads(j.get("tags") or "[]")
+    for u in users:
+        prof = {"title": u["title"], "location": u["location"],
+                "cv_text": "", "skills": json.loads(u["skills"] or "[]")}
+        scored = []
+        for j in jobs:
+            m = matching.score(prof, j)
+            if m["score"] >= 40:
+                jj = dict(j); jj["match"] = m; scored.append(jj)
+        scored.sort(key=lambda x: x["match"]["score"], reverse=True)
+        top = scored[:5]
+        if not top:
+            continue
+        notifications.send_job_alert(to_email=u["email"], name=u["name"], jobs=top)
+        with get_conn() as conn:
+            conn.execute("UPDATE users SET alerts_sent_at=? WHERE id=?", (today, u["id"]))
+
+
 def _worker(refresh_every_sec: int):
     while True:
         try:
             purge_expired()
             _refresh_jobs()
+            _send_alerts()
         except Exception as e:
             print(f"[maintenance] cycle échoué: {e}")
         time.sleep(refresh_every_sec)

@@ -89,3 +89,22 @@ def decode_token(token: str):
     if payload.get("exp", 0) < time.time():
         return None
     return payload
+
+
+# --- password-reset tokens (short-lived, single purpose) ---
+RESET_TTL = 3600  # 1 hour
+
+
+def create_reset_token(user_id: int) -> str:
+    payload = {"uid": user_id, "typ": "reset", "exp": int(time.time()) + RESET_TTL}
+    body = _b64(json.dumps(payload).encode())
+    sig = _b64(hmac.new(SECRET, body.encode(), hashlib.sha256).digest())
+    return f"{body}.{sig}"
+
+
+def verify_reset_token(token: str):
+    """Return the user id for a valid reset token, else None."""
+    p = decode_token(token)
+    if not p or p.get("typ") != "reset":
+        return None
+    return p.get("uid")
