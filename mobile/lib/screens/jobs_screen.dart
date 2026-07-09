@@ -63,8 +63,12 @@ class _JobsScreenState extends State<JobsScreen> {
 
   static const _categories = {
     'Tech': 'développeur', 'Data': 'data', 'Design': 'designer',
-    'Marketing': 'marketing', 'Commercial': 'commercial', 'Finance': 'finance',
-    'RH': 'ressources humaines', 'Santé': 'infirmier', 'Logistique': 'logistique',
+    'Marketing': 'marketing', 'Commercial': 'commercial', 'Vente': 'vendeur',
+    'Restauration': 'restauration', 'Hôtellerie': 'réceptionniste',
+    'Aéronautique': 'aéronautique', 'Industrie': 'industrie', 'BTP': 'maçon',
+    'Transport': 'chauffeur', 'Logistique': 'cariste', 'Santé': 'aide-soignant',
+    'Sécurité': 'agent de sécurité', 'Finance': 'finance', 'Comptabilité': 'comptable',
+    'RH': 'ressources humaines', 'Beauté': 'coiffeur',
   };
   List<String> _history = []; // "query|location" entries, most recent first
   String _profileTitle = '';

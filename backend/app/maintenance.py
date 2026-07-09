@@ -23,10 +23,30 @@ def purge_expired():
         )
 
 
-# popular queries kept warm so the feed is never empty (incl. work-study)
-WARM_QUERIES = ["python", "javascript", "data", "design", "marketing", "devops",
-                "alternance", "alternance informatique", "alternance commerce",
-                "alternance marketing", "apprentissage"]
+# Popular queries kept warm so the DB stays full and diverse across sectors
+# (tech, but also restauration, commerce, aéronautique, BTP, industrie, santé…).
+WARM_QUERIES = [
+    # tech / bureau
+    "développeur", "data", "design", "marketing", "devops", "comptable",
+    "ressources humaines", "assistant administratif", "chef de projet",
+    # restauration / hôtellerie
+    "serveur", "cuisinier", "restauration", "commis de cuisine", "réceptionniste",
+    "employé polyvalent", "boulanger",
+    # commerce / vente
+    "commercial", "vendeur", "conseiller de vente", "téléconseiller", "caissier",
+    # aéronautique / industrie
+    "aéronautique", "mécanicien", "technicien de maintenance", "opérateur de production",
+    "soudeur", "usineur",
+    # BTP
+    "maçon", "électricien", "plombier", "chef de chantier", "peintre",
+    # transport / logistique
+    "chauffeur", "cariste", "préparateur de commandes", "livreur",
+    # santé / services
+    "aide-soignant", "infirmier", "auxiliaire de vie", "agent de sécurité",
+    "agent d'entretien", "coiffeur",
+    # alternance (tous secteurs)
+    "alternance", "apprentissage", "alternance commerce", "alternance restauration",
+]
 
 
 def _refresh_jobs():

@@ -35,6 +35,28 @@ _SYN = {
     "apprentissage": ["alternance", "alternant", "apprenti"],
     "alternant": ["alternance", "apprentissage", "apprenti"],
     "apprenti": ["apprentissage", "alternance", "alternant"],
+    # --- métiers physiques / secteurs non-tech ---
+    "serveur": ["serveuse", "service en salle", "restauration", "runner"],
+    "cuisinier": ["cuisine", "chef de partie", "commis de cuisine", "cook", "chef"],
+    "restauration": ["serveur", "cuisinier", "hôtellerie", "restauration rapide"],
+    "restaurant": ["restauration", "serveur", "cuisinier"],
+    "aéronautique": ["aeronautique", "aviation", "aerospace", "aéronef"],
+    "aeronautique": ["aéronautique", "aviation", "aerospace"],
+    "mécanicien": ["mecanicien", "mécanique", "technicien mécanique", "mechanic"],
+    "maçon": ["macon", "maçonnerie", "gros œuvre", "btp"],
+    "électricien": ["electricien", "électricité", "electrical"],
+    "plombier": ["plomberie", "chauffagiste"],
+    "chauffeur": ["conducteur", "livreur", "routier", "driver"],
+    "cariste": ["magasinier", "préparateur de commandes", "manutentionnaire"],
+    "aide-soignant": ["aide soignant", "aide-soignante", "soignant"],
+    "soudeur": ["soudure", "chaudronnier", "welder"],
+    "boulanger": ["boulangerie", "pâtissier", "boulanger-pâtissier"],
+    "coiffeur": ["coiffeuse", "coiffure", "hairdresser"],
+    "sécurité": ["agent de sécurité", "gardien", "vigile", "security"],
+    "réceptionniste": ["réception", "front desk", "accueil"],
+    "caissier": ["caissière", "hôte de caisse", "encaissement"],
+    "btp": ["bâtiment", "construction", "gros œuvre", "chantier"],
+    "industrie": ["production", "usine", "manufacturing", "maintenance industrielle"],
 }
 
 
