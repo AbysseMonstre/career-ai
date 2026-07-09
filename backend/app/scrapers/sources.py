@@ -158,29 +158,33 @@ class Adzuna(BaseScraper):
         if not (app_id and app_key):
             return []
         country = os.environ.get("ADZUNA_COUNTRY", "fr")
-        params = {"app_id": app_id, "app_key": app_key, "results_per_page": 30,
-                  "what": query or "developer", "content-type": "application/json"}
-        if location:
-            params["where"] = location
-        try:
-            url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/1"
-            data = http_get(url, params=params).json()
-        except Exception:
-            return []
+        pages = int(os.environ.get("ADZUNA_PAGES", "2"))  # 50 results/page
         out = []
-        for j in data.get("results", []):
-            out.append({
-                "source": self.name,
-                "ext_id": str(j.get("id")),
-                "title": j.get("title", ""),
-                "company": (j.get("company") or {}).get("display_name", ""),
-                "location": (j.get("location") or {}).get("display_name", ""),
-                "url": j.get("redirect_url", ""),
-                "description": strip_html(j.get("description", "")),
-                "tags": [(j.get("category") or {}).get("label", "")] if j.get("category") else [],
-                "salary": _salary(j.get("salary_min"), j.get("salary_max")),
-                "posted_at": j.get("created", ""),
-            })
+        for page in range(1, pages + 1):
+            params = {"app_id": app_id, "app_key": app_key, "results_per_page": 50,
+                      "what": query or "developer", "content-type": "application/json"}
+            if location:
+                params["where"] = location
+            try:
+                url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/{page}"
+                results = http_get(url, params=params).json().get("results", [])
+            except Exception:
+                break
+            for j in results:
+                out.append({
+                    "source": self.name,
+                    "ext_id": str(j.get("id")),
+                    "title": j.get("title", ""),
+                    "company": (j.get("company") or {}).get("display_name", ""),
+                    "location": (j.get("location") or {}).get("display_name", ""),
+                    "url": j.get("redirect_url", ""),
+                    "description": strip_html(j.get("description", "")),
+                    "tags": [(j.get("category") or {}).get("label", "")] if j.get("category") else [],
+                    "salary": _salary(j.get("salary_min"), j.get("salary_max")),
+                    "posted_at": j.get("created", ""),
+                })
+            if len(results) < 50:
+                break
         return out
 
 
@@ -208,30 +212,40 @@ class FranceTravail(BaseScraper):
             return []
         try:
             token = self._token(cid, secret)
-            params = {"motsCles": query} if query else {}
-            resp = requests.get(
-                "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search",
-                headers={"Authorization": f"Bearer {token}"}, params=params, timeout=TIMEOUT)
-            if resp.status_code not in (200, 206):
-                return []
-            data = resp.json()
         except Exception:
             return []
+        headers = {"Authorization": f"Bearer {token}"}
+        pages = int(os.environ.get("FT_PAGES", "2"))  # 150 results per page
         out = []
-        for j in data.get("resultats", []):
-            sal = (j.get("salaire") or {}).get("libelle", "") or ""
-            out.append({
-                "source": self.name,
-                "ext_id": str(j.get("id")),
-                "title": j.get("intitule", ""),
-                "company": (j.get("entreprise") or {}).get("nom", ""),
-                "location": (j.get("lieuTravail") or {}).get("libelle", ""),
-                "url": (j.get("origineOffre") or {}).get("urlOrigine", ""),
-                "description": strip_html(j.get("description", "")),
-                "tags": [c.get("libelle", "") for c in (j.get("competences") or [])][:5],
-                "salary": sal,
-                "posted_at": j.get("dateCreation", ""),
-            })
+        for i in range(pages):
+            start = i * 150
+            params = {"range": f"{start}-{start + 149}"}
+            if query:
+                params["motsCles"] = query
+            try:
+                resp = requests.get(
+                    "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search",
+                    headers=headers, params=params, timeout=TIMEOUT)
+                if resp.status_code not in (200, 206):
+                    break
+                res = resp.json().get("resultats", [])
+            except Exception:
+                break
+            for j in res:
+                out.append({
+                    "source": self.name,
+                    "ext_id": str(j.get("id")),
+                    "title": j.get("intitule", ""),
+                    "company": (j.get("entreprise") or {}).get("nom", ""),
+                    "location": (j.get("lieuTravail") or {}).get("libelle", ""),
+                    "url": (j.get("origineOffre") or {}).get("urlOrigine", ""),
+                    "description": strip_html(j.get("description", "")),
+                    "tags": [c.get("libelle", "") for c in (j.get("competences") or [])][:5],
+                    "salary": (j.get("salaire") or {}).get("libelle", "") or "",
+                    "posted_at": j.get("dateCreation", ""),
+                })
+            if len(res) < 150:
+                break
         return out
 
 
