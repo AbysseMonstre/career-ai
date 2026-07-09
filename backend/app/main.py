@@ -548,8 +548,14 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
             if ws:
                 _qterms.append(ws)
 
+    # fetch a bounded, ranked candidate set; truncate the description so the row
+    # payload stays small (full text isn't needed to list/rank offers).
+    fetch_n = max(limit * 4, 200)
+
     def build():
-        sql = "SELECT * FROM jobs WHERE 1=1"
+        sql = ("SELECT id, source, ext_id, title, company, location, url, "
+               "substr(description, 1, 600) AS description, tags, salary, posted_at, "
+               "fetched_at, recruiter_id FROM jobs WHERE 1=1")
         args = []
         if _qterms:
             ors = []
@@ -565,7 +571,8 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
                     " OR LOWER(location) LIKE '%anywhere%' OR LOWER(location) LIKE '%worldwide%'"
                     " OR LOWER(location) LIKE '%télétravail%')")
             args.append(f"%{location.lower()}%")
-        sql += " ORDER BY fetched_at DESC LIMIT 1500"
+        sql += " ORDER BY fetched_at DESC LIMIT ?"
+        args.append(fetch_n)
         return sql, args
 
     with get_conn() as conn:
@@ -613,7 +620,10 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
     if favorites_only:
         rows = [j for j in rows if j["liked"]]
 
-    if profile is not None:
+    # Only score when the candidate actually has a CV — scoring parses every job,
+    # so skipping it for anonymous/no-CV users keeps search instant.
+    has_profile = profile is not None and bool(profile.get("skills") or profile.get("title"))
+    if has_profile:
         for j in rows:
             j["match"] = matching.score(profile, j)
 
@@ -636,7 +646,7 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
 
     if sort == "recent":
         rows.sort(key=lambda x: x.get("fetched_at", ""), reverse=True)
-    elif profile is not None:
+    elif has_profile:
         rows.sort(key=lambda x: x["match"]["score"], reverse=True)
     return {"count": len(rows[:limit]), "jobs": rows[:limit], "ai_enabled": ai.available()}
 
