@@ -382,6 +382,16 @@ class _JobsScreenState extends State<JobsScreen> {
               label: const Text('Voir aussi sur Google'),
               style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
             ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () => showEventsSheet(context),
+              icon: const Icon(Icons.event_available, size: 18),
+              label: const Text('Salons & événements emploi'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                backgroundColor: AppTheme.violet,
+              ),
+            ),
           ]),
         ),
         if (_history.isNotEmpty) ...[
