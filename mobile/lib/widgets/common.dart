@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/app_state.dart';
 import '../screens/legal_screen.dart';
@@ -119,12 +120,17 @@ class CareerTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 8, 0),
+      padding: const EdgeInsets.fromLTRB(16, 6, 6, 0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text('Career AI',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          const Spacer(),
+          IconButton(
+            onPressed: () => showEventsSheet(context),
+            icon: const Icon(Icons.event_available, color: AppTheme.violetLight),
+            tooltip: 'Événements emploi',
+          ),
           TextButton.icon(
             onPressed: () => _logout(context),
             icon: const Icon(Icons.logout, size: 18, color: AppTheme.red),
@@ -132,13 +138,64 @@ class CareerTopBar extends StatelessWidget {
                 style: TextStyle(color: AppTheme.red, fontWeight: FontWeight.w700)),
             style: TextButton.styleFrom(
               backgroundColor: AppTheme.red.withValues(alpha: 0.12),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Events sheet: access all France Travail employment events (job fairs, forums,
+/// job dating, online salons…) across every sector — each with its own link.
+void showEventsSheet(BuildContext context) {
+  Future<void> open(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (context.mounted) showError(context, "Impossible d'ouvrir $url");
+    }
+  }
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppTheme.sheet,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+    builder: (_) => Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: const [
+          Icon(Icons.event_available, color: AppTheme.violetLight),
+          SizedBox(width: 10),
+          Text('Événements emploi', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+        ]),
+        const SizedBox(height: 6),
+        const Text(
+          'Salons, forums, job dating, réunions d’information… tous secteurs, partout en France. '
+          'Chaque événement a son inscription/lien sur la plateforme officielle.',
+          style: TextStyle(color: AppTheme.muted, height: 1.5),
+        ),
+        const SizedBox(height: 18),
+        FilledButton.icon(
+          onPressed: () => open('https://mesevenementsemploi.francetravail.fr/mes-evenements-emploi/evenements'),
+          icon: const Icon(Icons.groups_2),
+          label: const Text('Salons & forums près de chez moi'),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: () => open('https://salonenligne.francetravail.fr/candidat'),
+          icon: const Icon(Icons.computer),
+          label: const Text('Salons en ligne'),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+        ),
+        const SizedBox(height: 10),
+        const Text('Source officielle : France Travail.',
+            style: TextStyle(color: AppTheme.muted2, fontSize: 12)),
+      ]),
+    ),
+  );
 }
 
 /// RGPD "right to erasure": a subtle button that deletes the account after
