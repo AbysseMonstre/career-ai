@@ -581,11 +581,13 @@ def list_jobs(query: str = "", location: str = "", limit: int = 50, sync: bool =
             "SELECT job_id FROM favorites WHERE user_id=?", (user["id"],)).fetchall()}
         sql, args = build()
         rows = [_job_row_to_dict(r) for r in conn.execute(sql, args).fetchall()]
-        # Self-populate ONLY when the DB is basically empty (fresh/ephemeral) — never
+        # Self-populate ONLY when the DB is essentially empty (fresh/ephemeral) — never
         # scrape live just because one query has no match, otherwise every rare search
         # would trigger a heavy live scrape. A rich DB is kept fresh by warm queries.
-        total_jobs = conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"]
-        if not rows and not favorites_only and total_jobs < 300:
+        # (Cheap existence check, not COUNT(*), which would scan the whole table.)
+        db_small = (not rows) and not favorites_only and \
+            conn.execute("SELECT 1 FROM jobs LIMIT 1 OFFSET 300").fetchone() is None
+        if db_small:
             if alternance:
                 base = query.strip()
                 populate = ([base] if base else []) + ["alternance"] \

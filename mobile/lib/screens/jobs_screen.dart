@@ -168,7 +168,7 @@ class _JobsScreenState extends State<JobsScreen> {
       await api.activityPing();
       _jobs = await api.jobs(
           query: _search.text.trim(), location: _location.text.trim(),
-          alternance: true, sync: true, sort: _sort, favoritesOnly: _favoritesOnly);
+          alternance: true, sort: _sort, favoritesOnly: _favoritesOnly);
       if (mounted) showOk(context, '${_jobs.length} offres en alternance');
     } catch (e) {
       if (mounted) showError(context, e);
@@ -177,9 +177,17 @@ class _JobsScreenState extends State<JobsScreen> {
     }
   }
 
+  // Fast search: read the (already rich) DB, no live scraping. The "Synchroniser"
+  // button does a live refresh when the user explicitly wants fresh offers.
+  Future<void> _runSearch() async {
+    HapticFeedback.selectionClick();
+    _saveSearch(_search.text.trim(), _location.text.trim());
+    await _load();
+  }
+
   void _runCategory(String query) {
     _search.text = query;
-    _searchAndSync();
+    _runSearch();
   }
 
   Future<void> _toggleLike(Job job) async {
@@ -196,7 +204,7 @@ class _JobsScreenState extends State<JobsScreen> {
     final parts = entry.split('|');
     _search.text = parts.isNotEmpty ? parts[0] : '';
     _location.text = parts.length > 1 ? parts[1] : '';
-    _searchAndSync();
+    _runSearch();
   }
 
   // Search = synchronize: scrape every source for this query + location, then show.
@@ -274,7 +282,7 @@ class _JobsScreenState extends State<JobsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: TextField(
             controller: _search,
-            onSubmitted: (_) => _searchAndSync(),
+            onSubmitted: (_) => _runSearch(),
             decoration: const InputDecoration(
               hintText: 'Métier, techno (python, design, marketing...)',
               prefixIcon: Icon(Icons.search),
@@ -288,7 +296,7 @@ class _JobsScreenState extends State<JobsScreen> {
             Expanded(
               child: TextField(
                 controller: _location,
-                onSubmitted: (_) => _searchAndSync(),
+                onSubmitted: (_) => _runSearch(),
                 decoration: const InputDecoration(
                   hintText: 'Localisation (Paris, remote...)',
                   prefixIcon: Icon(Icons.place_outlined),
