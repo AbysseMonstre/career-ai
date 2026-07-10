@@ -16,6 +16,7 @@ class _TalentsScreenState extends State<TalentsScreen> {
   final _search = TextEditingController(text: 'python django aws');
   List<Candidate> _candidates = [];
   bool _loading = false;
+  String _statusFilter = ''; // '' = tous, sinon un statut ATS
   String _access = 'loading'; // loading | none | pending | granted
 
   @override
@@ -92,21 +93,57 @@ class _TalentsScreenState extends State<TalentsScreen> {
           ),
         ),
       ),
+      // pipeline filter (ATS)
+      SizedBox(
+        height: 40,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          children: [
+            _pipelineChip('', 'Tous'),
+            for (final o in _statusOptions) _pipelineChip(o.$1, o.$2),
+          ],
+        ),
+      ),
+      const SizedBox(height: 4),
       Expanded(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _candidates.isEmpty
-                ? const Center(child: Text('Aucun candidat. Les chercheurs doivent importer leur CV.'))
-                : RefreshIndicator(
-                    onRefresh: _load,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      itemCount: _candidates.length,
-                      itemBuilder: (_, i) => _CandidateCard(_candidates[i]),
-                    ),
-                  ),
+        child: Builder(builder: (_) {
+          final list = _statusFilter.isEmpty
+              ? _candidates
+              : _candidates.where((c) => c.status == _statusFilter).toList();
+          if (_loading) return const Center(child: CircularProgressIndicator());
+          if (list.isEmpty) {
+            return Center(child: Text(_statusFilter.isEmpty
+                ? 'Aucun candidat. Les chercheurs doivent importer leur CV.'
+                : 'Aucun candidat dans « ${statusMeta(_statusFilter).label} ».'));
+          }
+          return RefreshIndicator(
+            onRefresh: _load,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              itemCount: list.length,
+              itemBuilder: (_, i) => _CandidateCard(list[i]),
+            ),
+          );
+        }),
       ),
     ]);
+  }
+
+  Widget _pipelineChip(String value, String label) {
+    final sel = _statusFilter == value;
+    final n = value.isEmpty ? _candidates.length : _candidates.where((c) => c.status == value).length;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        selected: sel,
+        onSelected: (_) => setState(() => _statusFilter = value),
+        label: Text('$label${n > 0 ? ' ($n)' : ''}'),
+        selectedColor: AppTheme.primary,
+        labelStyle: TextStyle(color: sel ? Colors.white : AppTheme.muted, fontSize: 13),
+        backgroundColor: AppTheme.glass(),
+      ),
+    );
   }
 }
 
@@ -210,6 +247,57 @@ class _AccessGateState extends State<_AccessGate> {
   }
 }
 
+({String label, Color color}) statusMeta(String s) => switch (s) {
+      'preselectionne' => (label: 'Présélectionné', color: AppTheme.violetLight),
+      'entretien' => (label: 'Entretien', color: AppTheme.amber),
+      'retenu' => (label: 'Retenu', color: AppTheme.green),
+      'refuse' => (label: 'Refusé', color: AppTheme.red),
+      _ => (label: 'Nouveau', color: AppTheme.muted),
+    };
+
+const List<(String, String)> _statusOptions = [
+  ('nouveau', 'Nouveau'), ('preselectionne', 'Présélectionné'),
+  ('entretien', 'Entretien'), ('retenu', 'Retenu'), ('refuse', 'Refusé'),
+];
+
+Future<String?> _pickStatus(BuildContext context, String current) {
+  return showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: AppTheme.sheet,
+    builder: (_) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Padding(padding: EdgeInsets.all(16),
+            child: Text('Statut du candidat', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+        for (final o in _statusOptions)
+          ListTile(
+            leading: Icon(Icons.flag, color: statusMeta(o.$1).color),
+            title: Text(o.$2),
+            trailing: current == o.$1 ? const Icon(Icons.check, color: AppTheme.green) : null,
+            onTap: () => Navigator.pop(context, o.$1),
+          ),
+        const SizedBox(height: 8),
+      ]),
+    ),
+  );
+}
+
+Future<String?> _editNote(BuildContext context, String current) {
+  final ctrl = TextEditingController(text: current);
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: AppTheme.sheet,
+      title: const Text('Note privée'),
+      content: TextField(controller: ctrl, maxLines: 4, autofocus: true,
+          decoration: const InputDecoration(hintText: 'Vos remarques sur ce candidat…')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Enregistrer')),
+      ],
+    ),
+  );
+}
+
 class _CandidateCard extends StatelessWidget {
   final Candidate c;
   const _CandidateCard(this.c);
@@ -296,7 +384,74 @@ class _CandidateCard extends StatelessWidget {
           const SizedBox(height: 14),
           Text('${c.match.matchedSkills.length} compétences en commun',
               style: const TextStyle(fontSize: 12, color: AppTheme.muted, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
+          // --- ATS: pipeline status + star rating + private note ---
+          StatefulBuilder(builder: (ctx, setLocal) {
+            Future<void> save({String? status, int? rating, String? note}) async {
+              try {
+                await ctx.read<AppState>().api.setCandidateStatus(
+                    c.candidateId, status: status, rating: rating, note: note);
+                setLocal(() {
+                  if (status != null) c.status = status;
+                  if (rating != null) c.rating = rating;
+                  if (note != null) c.note = note;
+                });
+              } catch (e) {
+                if (ctx.mounted) showError(ctx, e);
+              }
+            }
+
+            final meta = statusMeta(c.status);
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                InkWell(
+                  onTap: () async {
+                    final s = await _pickStatus(ctx, c.status);
+                    if (s != null) save(status: s);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: meta.color.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.flag, size: 13, color: meta.color),
+                      const SizedBox(width: 5),
+                      Text(meta.label,
+                          style: TextStyle(color: meta.color, fontSize: 12, fontWeight: FontWeight.w700)),
+                      const Icon(Icons.arrow_drop_down, size: 16, color: AppTheme.muted),
+                    ]),
+                  ),
+                ),
+                const Spacer(),
+                for (int i = 1; i <= 5; i++)
+                  GestureDetector(
+                    onTap: () => save(rating: i == c.rating ? 0 : i),
+                    child: Icon(i <= c.rating ? Icons.star : Icons.star_border,
+                        size: 20, color: AppTheme.amber),
+                  ),
+              ]),
+              if (c.note.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text('📝 ${c.note}', style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
+              ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final n = await _editNote(ctx, c.note);
+                    if (n != null) save(note: n);
+                  },
+                  icon: const Icon(Icons.edit_note, size: 18),
+                  label: Text(c.note.isEmpty ? 'Ajouter une note' : 'Modifier la note',
+                      style: const TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
+                ),
+              ),
+            ]);
+          }),
+          const SizedBox(height: 4),
           Row(children: [
             Expanded(
               child: FilledButton.icon(

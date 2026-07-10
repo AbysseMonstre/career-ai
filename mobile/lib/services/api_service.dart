@@ -299,6 +299,18 @@ class ApiService {
     return Map<String, dynamic>.from(_decode(r));
   }
 
+  Future<Map<String, dynamic>> setCandidateStatus(int candidateId,
+      {String? status, int? rating, String? note}) async {
+    final r = await http.post(_u('/recruiter/candidate/$candidateId'),
+        headers: _headers,
+        body: jsonEncode({
+          if (status != null) 'status': status,
+          if (rating != null) 'rating': rating,
+          if (note != null) 'note': note,
+        }));
+    return Map<String, dynamic>.from(_decode(r));
+  }
+
   Future<List<Candidate>> talents({String query = '', int? jobId}) async {
     final q = {'query': query, if (jobId != null) 'job_id': jobId};
     final r = await http.get(_u('/talents', q), headers: _headers);

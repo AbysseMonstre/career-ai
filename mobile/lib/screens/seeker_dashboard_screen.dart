@@ -60,6 +60,8 @@ class _SeekerDashboardScreenState extends State<SeekerDashboardScreen> {
                         children: [
           const SizedBox(height: 12),
           if (d.skills.isEmpty) ...[const CvNudge(), const SizedBox(height: 4)],
+          _GamificationCard(d),
+          const SizedBox(height: 8),
           if (_activity != null) _StreakCard(_activity!),
           const SizedBox(height: 12),
           GridView.count(
@@ -200,6 +202,72 @@ class _StreakCard extends StatelessWidget {
             ]);
           }),
         ),
+      ]),
+    );
+  }
+}
+
+/// Gamification: profile completion + level + achievement badges.
+class _GamificationCard extends StatelessWidget {
+  final SeekerDashboard d;
+  const _GamificationCard(this.d);
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+                gradient: AppTheme.brandGradient, borderRadius: BorderRadius.circular(10)),
+            child: Text('Niveau ${d.level}',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text('Profil complété à ${d.completion}%',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          Text('${d.unlocked}/${d.totalBadges} 🏅',
+              style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
+        ]),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LinearProgressIndicator(
+            value: (d.completion / 100).clamp(0, 1),
+            minHeight: 8,
+            backgroundColor: Colors.white.withValues(alpha: 0.08),
+            valueColor: const AlwaysStoppedAnimation(AppTheme.violetLight),
+          ),
+        ),
+        if (d.completion < 100) ...[
+          const SizedBox(height: 6),
+          const Text('Complétez votre profil (CV, localisation, 1ʳᵉ candidature) pour être mieux repéré.',
+              style: TextStyle(color: AppTheme.muted, fontSize: 12)),
+        ],
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final a in d.achievements)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: a.done ? AppTheme.violet.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: a.done ? AppTheme.violetLight.withValues(alpha: 0.5) : AppTheme.glassBorder()),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Opacity(opacity: a.done ? 1 : 0.4, child: Text(a.emoji, style: const TextStyle(fontSize: 14))),
+                const SizedBox(width: 6),
+                Text(a.label, style: TextStyle(
+                    fontSize: 12,
+                    color: a.done ? Colors.white : AppTheme.muted2,
+                    fontWeight: a.done ? FontWeight.w700 : FontWeight.w400)),
+                if (a.done) ...[const SizedBox(width: 4), const Icon(Icons.check_circle, size: 13, color: AppTheme.green)],
+              ]),
+            ),
+        ]),
       ]),
     );
   }

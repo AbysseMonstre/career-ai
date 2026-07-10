@@ -136,6 +136,17 @@ CREATE TABLE IF NOT EXISTS applications (
     created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, job_id)
 );
+
+-- Recruiter pipeline (ATS): a recruiter's status / rating / private note per candidate.
+CREATE TABLE IF NOT EXISTS candidate_status (
+    recruiter_id INTEGER NOT NULL REFERENCES users(id),
+    candidate_id INTEGER NOT NULL REFERENCES users(id),
+    status       TEXT DEFAULT 'nouveau',   -- nouveau|preselectionne|entretien|retenu|refuse
+    rating       INTEGER DEFAULT 0,        -- 0-5 stars
+    note         TEXT DEFAULT '',
+    updated_at   TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (recruiter_id, candidate_id)
+);
 """
 
 

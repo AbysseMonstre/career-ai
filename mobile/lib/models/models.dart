@@ -138,6 +138,10 @@ class Candidate {
   final List<String> skills;
   final MatchStats match;
   final int applied; // number of offers this candidate has applied to
+  // recruiter pipeline (mutable so the UI updates instantly)
+  String status; // nouveau | preselectionne | entretien | retenu | refuse
+  int rating; // 0-5
+  String note;
 
   Candidate({
     required this.candidateId,
@@ -148,6 +152,9 @@ class Candidate {
     required this.skills,
     required this.match,
     this.applied = 0,
+    this.status = 'nouveau',
+    this.rating = 0,
+    this.note = '',
   });
 
   factory Candidate.fromJson(Map<String, dynamic> j) => Candidate(
@@ -159,6 +166,9 @@ class Candidate {
         skills: List<String>.from(j['skills'] ?? []),
         match: MatchStats.fromJson(j['match']),
         applied: j['applied'] ?? 0,
+        status: j['status'] ?? 'nouveau',
+        rating: j['rating'] ?? 0,
+        note: j['note'] ?? '',
       );
 }
 
@@ -205,6 +215,18 @@ class Interview {
       );
 }
 
+class Achievement {
+  final String id;
+  final String label;
+  final String emoji;
+  final bool done;
+  Achievement({required this.id, required this.label, required this.emoji, required this.done});
+  factory Achievement.fromJson(Map<String, dynamic> j) => Achievement(
+        id: j['id'] ?? '', label: j['label'] ?? '', emoji: j['emoji'] ?? '🏅',
+        done: j['done'] == true,
+      );
+}
+
 class SeekerDashboard {
   final String title;
   final String location;
@@ -216,6 +238,11 @@ class SeekerDashboard {
   final int totalApplications;
   final int avgMatchScore;
   final int jobsAvailable;
+  final int completion; // profile completion %
+  final int level;
+  final int unlocked;
+  final int totalBadges;
+  final List<Achievement> achievements;
 
   SeekerDashboard({
     required this.title,
@@ -228,11 +255,17 @@ class SeekerDashboard {
     required this.totalApplications,
     required this.avgMatchScore,
     required this.jobsAvailable,
+    this.completion = 0,
+    this.level = 1,
+    this.unlocked = 0,
+    this.totalBadges = 0,
+    this.achievements = const [],
   });
 
   factory SeekerDashboard.fromJson(Map<String, dynamic> j) {
     final p = j['profile'] ?? {};
     final a = j['applications'] ?? {};
+    final g = j['gamification'] ?? {};
     return SeekerDashboard(
       title: p['title'] ?? '',
       location: p['location'] ?? '',
@@ -244,6 +277,12 @@ class SeekerDashboard {
       totalApplications: a['total'] ?? 0,
       avgMatchScore: j['avg_match_score'] ?? 0,
       jobsAvailable: j['jobs_available'] ?? 0,
+      completion: g['completion'] ?? 0,
+      level: g['level'] ?? 1,
+      unlocked: g['unlocked'] ?? 0,
+      totalBadges: g['total_badges'] ?? 0,
+      achievements: ((g['achievements'] ?? []) as List)
+          .map((e) => Achievement.fromJson(e)).toList(),
     );
   }
 }

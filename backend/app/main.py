@@ -1119,8 +1119,27 @@ def seeker_dashboard(user: dict = Depends(require_role("seeker"))):
             "SELECT status, COUNT(*) c, AVG(match_score) avg FROM applications "
             "WHERE user_id=? GROUP BY status", (user["id"],)).fetchall()
         total = conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"]
+        interviews_n = conn.execute(
+            "SELECT COUNT(*) c FROM interviews WHERE candidate_id=?", (user["id"],)).fetchone()["c"]
+        active_days = conn.execute(
+            "SELECT COUNT(*) c FROM activity WHERE user_id=?", (user["id"],)).fetchone()["c"]
     by_status = {r["status"]: r["c"] for r in apps}
     avg_match = next((round(r["avg"]) for r in apps if r["avg"] is not None), 0)
+    applied_total = sum(by_status.values())
+
+    # --- gamification: profile completion + achievements ---
+    steps = [bool(profile["title"]), bool(profile["skills"]), bool(profile["location"]),
+             bool(profile["cv_text"]), applied_total >= 1]
+    completion = round(100 * sum(1 for s in steps if s) / len(steps))
+    achievements = [
+        {"id": "cv", "label": "CV importé", "emoji": "📄", "done": bool(profile["skills"])},
+        {"id": "apply1", "label": "1ʳᵉ candidature", "emoji": "🎯", "done": applied_total >= 1},
+        {"id": "apply5", "label": "5 candidatures", "emoji": "🔥", "done": applied_total >= 5},
+        {"id": "apply20", "label": "20 candidatures", "emoji": "🚀", "done": applied_total >= 20},
+        {"id": "interview", "label": "Premier entretien", "emoji": "🤝", "done": interviews_n >= 1},
+        {"id": "active7", "label": "7 jours actifs", "emoji": "⭐", "done": active_days >= 7},
+    ]
+    unlocked = sum(1 for a in achievements if a["done"])
     return {
         "profile": {"title": profile["title"], "location": profile["location"],
                     "skills": profile["skills"], "skill_count": len(profile["skills"])},
@@ -1129,10 +1148,17 @@ def seeker_dashboard(user: dict = Depends(require_role("seeker"))):
             "validated": by_status.get("validated", 0),
             "pending": by_status.get("auto_pending", 0),
             "rejected": by_status.get("rejected", 0),
-            "total": sum(by_status.values()),
+            "total": applied_total,
         },
         "avg_match_score": avg_match,
         "jobs_available": total,
+        "gamification": {
+            "completion": completion,
+            "level": 1 + unlocked,  # simple level = badges unlocked + 1
+            "achievements": achievements,
+            "unlocked": unlocked,
+            "total_badges": len(achievements),
+        },
     }
 
 
@@ -1233,10 +1259,14 @@ def talents(query: str = "", job_id: Optional[int] = None,
         # (have skills) OR they applied to at least one offer.
         rows = conn.execute(
             """SELECT p.user_id, p.title, p.location, p.skills, p.cv_text, u.name,
-                      (SELECT COUNT(*) FROM applications a WHERE a.user_id=p.user_id) AS applied
+                      (SELECT COUNT(*) FROM applications a WHERE a.user_id=p.user_id) AS applied,
+                      cs.status AS cs_status, cs.rating AS cs_rating, cs.note AS cs_note
                FROM profiles p JOIN users u ON u.id=p.user_id
+               LEFT JOIN candidate_status cs
+                      ON cs.candidate_id=p.user_id AND cs.recruiter_id=?
                WHERE p.skills != '[]'
-                  OR p.user_id IN (SELECT user_id FROM applications)""").fetchall()
+                  OR p.user_id IN (SELECT user_id FROM applications)""",
+            (user["id"],)).fetchall()
 
     results = []
     for r in rows:
@@ -1249,10 +1279,45 @@ def talents(query: str = "", job_id: Optional[int] = None,
             "title": r["title"], "location": r["location"],
             "skills": prof["skills"], "match": m,
             "applied": r["applied"] or 0,
+            "status": r["cs_status"] or "nouveau",
+            "rating": r["cs_rating"] or 0,
+            "note": r["cs_note"] or "",
         })
     # active applicants first, then by match score
     results.sort(key=lambda x: (x["applied"] > 0, x["match"]["score"]), reverse=True)
     return {"count": len(results), "candidates": results}
+
+
+class CandidateStatusIn(BaseModel):
+    status: Optional[str] = None
+    rating: Optional[int] = None
+    note: Optional[str] = None
+
+
+_ATS_STATUSES = {"nouveau", "preselectionne", "entretien", "retenu", "refuse"}
+
+
+@app.post("/recruiter/candidate/{candidate_id}")
+def set_candidate_status(candidate_id: int, body: CandidateStatusIn,
+                         user: dict = Depends(require_role("recruiter"))):
+    """Upsert the recruiter's pipeline status / rating / note for a candidate."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT status, rating, note FROM candidate_status WHERE recruiter_id=? AND candidate_id=?",
+            (user["id"], candidate_id)).fetchone()
+        cur = dict(row) if row else {"status": "nouveau", "rating": 0, "note": ""}
+        status = body.status if body.status in _ATS_STATUSES else cur["status"]
+        rating = body.rating if body.rating is not None else cur["rating"]
+        rating = max(0, min(5, int(rating or 0)))
+        note = body.note if body.note is not None else cur["note"]
+        conn.execute(
+            """INSERT INTO candidate_status (recruiter_id, candidate_id, status, rating, note, updated_at)
+               VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)
+               ON CONFLICT(recruiter_id, candidate_id) DO UPDATE SET
+                   status=excluded.status, rating=excluded.rating,
+                   note=excluded.note, updated_at=CURRENT_TIMESTAMP""",
+            (user["id"], candidate_id, status, rating, note))
+    return {"status": status, "rating": rating, "note": note}
 
 
 # ---------- placement: company asks to be connected with a specific freelance ----------
