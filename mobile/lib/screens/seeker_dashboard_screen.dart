@@ -214,6 +214,7 @@ class _GamificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final g = d.gamification;
     return GlassCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -221,35 +222,35 @@ class _GamificationCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
                 gradient: AppTheme.brandGradient, borderRadius: BorderRadius.circular(10)),
-            child: Text('Niveau ${d.level}',
+            child: Text('Niveau ${g.level}',
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text('Profil complété à ${d.completion}%',
+            child: Text('Profil complété à ${g.completion}%',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
-          Text('${d.unlocked}/${d.totalBadges} 🏅',
+          Text('${g.unlocked}/${g.totalBadges} 🏅',
               style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
         ]),
         const SizedBox(height: 10),
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: LinearProgressIndicator(
-            value: (d.completion / 100).clamp(0, 1),
+            value: (g.completion / 100).clamp(0, 1),
             minHeight: 8,
             backgroundColor: Colors.white.withValues(alpha: 0.08),
             valueColor: const AlwaysStoppedAnimation(AppTheme.violetLight),
           ),
         ),
-        if (d.completion < 100) ...[
+        if (g.completion < 100) ...[
           const SizedBox(height: 6),
           const Text('Complétez votre profil (CV, localisation, 1ʳᵉ candidature) pour être mieux repéré.',
               style: TextStyle(color: AppTheme.muted, fontSize: 12)),
         ],
         const SizedBox(height: 12),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final a in d.achievements)
+          for (final a in g.achievements)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(

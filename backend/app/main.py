@@ -1111,6 +1111,16 @@ def my_applications(user: dict = Depends(require_role("seeker"))):
 
 
 # ---------- dashboards ----------
+def _xp_level(xp: int):
+    """Return (level, xp_within_level, xp_needed_for_next). Rising cost per level."""
+    level, base, need = 1, 0, 100
+    while xp >= base + need:
+        base += need
+        level += 1
+        need = int(need * 1.4)
+    return level, xp - base, need
+
+
 @app.get("/dashboard/seeker")
 def seeker_dashboard(user: dict = Depends(require_role("seeker"))):
     with get_conn() as conn:
@@ -1123,11 +1133,24 @@ def seeker_dashboard(user: dict = Depends(require_role("seeker"))):
             "SELECT COUNT(*) c FROM interviews WHERE candidate_id=?", (user["id"],)).fetchone()["c"]
         active_days = conn.execute(
             "SELECT COUNT(*) c FROM activity WHERE user_id=?", (user["id"],)).fetchone()["c"]
+        training_n = conn.execute(
+            "SELECT COUNT(*) c FROM training_sessions WHERE user_id=?", (user["id"],)).fetchone()["c"]
+        monday = (datetime.now(timezone.utc).date()
+                  - timedelta(days=datetime.now(timezone.utc).date().weekday())).isoformat()
+        apps_week = conn.execute(
+            "SELECT COUNT(*) c FROM applications WHERE user_id=? AND created_at >= ?",
+            (user["id"], monday)).fetchone()["c"]
+        train_week = conn.execute(
+            "SELECT COUNT(*) c FROM training_sessions WHERE user_id=? AND created_at >= ?",
+            (user["id"], monday)).fetchone()["c"]
+        days_week = conn.execute(
+            "SELECT COUNT(*) c FROM activity WHERE user_id=? AND day >= ?",
+            (user["id"], monday)).fetchone()["c"]
     by_status = {r["status"]: r["c"] for r in apps}
     avg_match = next((round(r["avg"]) for r in apps if r["avg"] is not None), 0)
     applied_total = sum(by_status.values())
 
-    # --- gamification: profile completion + achievements ---
+    # --- gamification: completion + achievements + XP/level + weekly missions ---
     steps = [bool(profile["title"]), bool(profile["skills"]), bool(profile["location"]),
              bool(profile["cv_text"]), applied_total >= 1]
     completion = round(100 * sum(1 for s in steps if s) / len(steps))
@@ -1140,6 +1163,18 @@ def seeker_dashboard(user: dict = Depends(require_role("seeker"))):
         {"id": "active7", "label": "7 jours actifs", "emoji": "⭐", "done": active_days >= 7},
     ]
     unlocked = sum(1 for a in achievements if a["done"])
+    # XP earned from useful actions
+    xp = ((50 if profile["skills"] else 0) + applied_total * 10 + active_days * 5
+          + interviews_n * 15 + training_n * 15)
+    level, xp_in, xp_next = _xp_level(xp)
+    missions = [
+        {"id": "apply3", "label": "Postuler à 3 offres", "emoji": "🎯",
+         "progress": min(apps_week, 3), "goal": 3, "xp": 30, "done": apps_week >= 3},
+        {"id": "active3", "label": "Être actif 3 jours", "emoji": "📅",
+         "progress": min(days_week, 3), "goal": 3, "xp": 20, "done": days_week >= 3},
+        {"id": "train1", "label": "1 entraînement d'entretien", "emoji": "🎤",
+         "progress": min(train_week, 1), "goal": 1, "xp": 15, "done": train_week >= 1},
+    ]
     return {
         "profile": {"title": profile["title"], "location": profile["location"],
                     "skills": profile["skills"], "skill_count": len(profile["skills"])},
@@ -1154,10 +1189,11 @@ def seeker_dashboard(user: dict = Depends(require_role("seeker"))):
         "jobs_available": total,
         "gamification": {
             "completion": completion,
-            "level": 1 + unlocked,  # simple level = badges unlocked + 1
+            "xp": xp, "level": level, "xp_in_level": xp_in, "xp_next": xp_next,
             "achievements": achievements,
             "unlocked": unlocked,
             "total_badges": len(achievements),
+            "missions": missions,
         },
     }
 
@@ -1173,10 +1209,35 @@ def recruiter_dashboard(user: dict = Depends(require_role("recruiter"))):
             """SELECT COUNT(*) c FROM applications a JOIN jobs j ON j.id=a.job_id
                WHERE j.recruiter_id=? AND a.status='validated'""",
             (user["id"],)).fetchone()["c"]
+        evaluated = conn.execute(
+            "SELECT COUNT(*) c FROM candidate_status WHERE recruiter_id=? "
+            "AND (rating > 0 OR status != 'nouveau')", (user["id"],)).fetchone()["c"]
+        interviews_set = conn.execute(
+            "SELECT COUNT(*) c FROM interviews WHERE recruiter_id=?", (user["id"],)).fetchone()["c"]
+        hired = conn.execute(
+            "SELECT COUNT(*) c FROM candidate_status WHERE recruiter_id=? AND status='retenu'",
+            (user["id"],)).fetchone()["c"]
+
+    achievements = [
+        {"id": "post1", "label": "1ʳᵉ offre publiée", "emoji": "📢", "done": my_jobs >= 1},
+        {"id": "eval5", "label": "5 candidats évalués", "emoji": "⭐", "done": evaluated >= 5},
+        {"id": "int1", "label": "1er entretien planifié", "emoji": "📅", "done": interviews_set >= 1},
+        {"id": "int5", "label": "5 entretiens planifiés", "emoji": "🗓️", "done": interviews_set >= 5},
+        {"id": "hire1", "label": "1er candidat retenu", "emoji": "🎉", "done": hired >= 1},
+    ]
+    unlocked = sum(1 for a in achievements if a["done"])
+    xp = my_jobs * 20 + evaluated * 5 + interviews_set * 15 + hired * 50
+    level, xp_in, xp_next = _xp_level(xp)
     return {
         "talent_pool_size": talent_count,
         "my_posted_jobs": my_jobs,
         "applications_received": apps_to_my_jobs,
+        "gamification": {
+            "xp": xp, "level": level, "xp_in_level": xp_in, "xp_next": xp_next,
+            "achievements": achievements,
+            "unlocked": unlocked,
+            "total_badges": len(achievements),
+        },
     }
 
 

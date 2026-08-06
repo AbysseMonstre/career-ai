@@ -227,6 +227,41 @@ class Achievement {
       );
 }
 
+class Mission {
+  final String id, label, emoji;
+  final int progress, goal, xp;
+  final bool done;
+  Mission({required this.id, required this.label, required this.emoji,
+    required this.progress, required this.goal, required this.xp, required this.done});
+  factory Mission.fromJson(Map<String, dynamic> j) => Mission(
+        id: j['id'] ?? '', label: j['label'] ?? '', emoji: j['emoji'] ?? '🎯',
+        progress: j['progress'] ?? 0, goal: j['goal'] ?? 1, xp: j['xp'] ?? 0,
+        done: j['done'] == true,
+      );
+}
+
+class Gamification {
+  final int completion, xp, level, xpInLevel, xpNext, unlocked, totalBadges;
+  final List<Achievement> achievements;
+  final List<Mission> missions;
+  Gamification({
+    this.completion = 0, this.xp = 0, this.level = 1, this.xpInLevel = 0,
+    this.xpNext = 100, this.unlocked = 0, this.totalBadges = 0,
+    this.achievements = const [], this.missions = const [],
+  });
+  factory Gamification.fromJson(Map<String, dynamic> j) => Gamification(
+        completion: j['completion'] ?? 0,
+        xp: j['xp'] ?? 0,
+        level: j['level'] ?? 1,
+        xpInLevel: j['xp_in_level'] ?? 0,
+        xpNext: j['xp_next'] ?? 100,
+        unlocked: j['unlocked'] ?? 0,
+        totalBadges: j['total_badges'] ?? 0,
+        achievements: ((j['achievements'] ?? []) as List).map((e) => Achievement.fromJson(e)).toList(),
+        missions: ((j['missions'] ?? []) as List).map((e) => Mission.fromJson(e)).toList(),
+      );
+}
+
 class SeekerDashboard {
   final String title;
   final String location;
@@ -238,11 +273,7 @@ class SeekerDashboard {
   final int totalApplications;
   final int avgMatchScore;
   final int jobsAvailable;
-  final int completion; // profile completion %
-  final int level;
-  final int unlocked;
-  final int totalBadges;
-  final List<Achievement> achievements;
+  final Gamification gamification;
 
   SeekerDashboard({
     required this.title,
@@ -255,17 +286,12 @@ class SeekerDashboard {
     required this.totalApplications,
     required this.avgMatchScore,
     required this.jobsAvailable,
-    this.completion = 0,
-    this.level = 1,
-    this.unlocked = 0,
-    this.totalBadges = 0,
-    this.achievements = const [],
-  });
+    Gamification? gamification,
+  }) : gamification = gamification ?? Gamification();
 
   factory SeekerDashboard.fromJson(Map<String, dynamic> j) {
     final p = j['profile'] ?? {};
     final a = j['applications'] ?? {};
-    final g = j['gamification'] ?? {};
     return SeekerDashboard(
       title: p['title'] ?? '',
       location: p['location'] ?? '',
@@ -277,12 +303,7 @@ class SeekerDashboard {
       totalApplications: a['total'] ?? 0,
       avgMatchScore: j['avg_match_score'] ?? 0,
       jobsAvailable: j['jobs_available'] ?? 0,
-      completion: g['completion'] ?? 0,
-      level: g['level'] ?? 1,
-      unlocked: g['unlocked'] ?? 0,
-      totalBadges: g['total_badges'] ?? 0,
-      achievements: ((g['achievements'] ?? []) as List)
-          .map((e) => Achievement.fromJson(e)).toList(),
+      gamification: Gamification.fromJson(j['gamification'] ?? {}),
     );
   }
 }
@@ -291,16 +312,19 @@ class RecruiterDashboard {
   final int talentPoolSize;
   final int myPostedJobs;
   final int applicationsReceived;
+  final Gamification gamification;
 
   RecruiterDashboard({
     required this.talentPoolSize,
     required this.myPostedJobs,
     required this.applicationsReceived,
-  });
+    Gamification? gamification,
+  }) : gamification = gamification ?? Gamification();
 
   factory RecruiterDashboard.fromJson(Map<String, dynamic> j) => RecruiterDashboard(
         talentPoolSize: j['talent_pool_size'] ?? 0,
         myPostedJobs: j['my_posted_jobs'] ?? 0,
         applicationsReceived: j['applications_received'] ?? 0,
+        gamification: Gamification.fromJson(j['gamification'] ?? {}),
       );
 }

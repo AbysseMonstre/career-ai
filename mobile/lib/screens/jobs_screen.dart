@@ -60,6 +60,19 @@ class _JobsScreenState extends State<JobsScreen> {
   bool _favoritesOnly = false;
   bool _alternance = false; // work-study mode: aggressively fetch alternance offers
   String _sort = 'match'; // match | recent
+  // The search chrome is collapsed by default so the offers list gets the screen.
+  bool _filtersOpen = false;
+
+  /// Number of narrowing filters currently applied (badge on the "Filtres" button).
+  int get _activeFilters {
+    var n = 0;
+    if (_location.text.trim().isNotEmpty) n++;
+    if (_contract.isNotEmpty) n++;
+    if (_remote) n++;
+    if (_alternance) n++;
+    if (_favoritesOnly) n++;
+    return n;
+  }
 
   static const _categories = {
     'Tech': 'développeur', 'Data': 'data', 'Design': 'designer',
@@ -242,79 +255,154 @@ class _JobsScreenState extends State<JobsScreen> {
     }
   }
 
+  /// Everything that isn't a daily gesture lives here, collapsed by default:
+  /// location, contract type, the secondary search actions and the history.
+  Widget _filtersPanel() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        TextField(
+          controller: _location,
+          onSubmitted: (_) => _runSearch(),
+          style: const TextStyle(fontSize: 14),
+          decoration: const InputDecoration(
+            isDense: true,
+            hintText: 'Localisation (Paris, remote...)',
+            prefixIcon: Icon(Icons.place_outlined, size: 19),
+            prefixIconConstraints: BoxConstraints(minWidth: 40),
+            contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          ...{
+            '': 'Tous contrats', 'cdi': 'CDI', 'cdd': 'CDD',
+            'freelance': 'Freelance', 'stage': 'Stage',
+          }.entries.map((e) => SizedBox(
+                height: 32,
+                child: _FilterChip(
+                  label: e.value,
+                  selected: _contract == e.key,
+                  onTap: () { setState(() => _contract = e.key); _load(); },
+                ),
+              )),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: _PanelAction(
+              icon: Icons.auto_awesome,
+              label: 'Mon CV',
+              tooltip: 'Trouver les offres qui collent à mon CV',
+              filled: true,
+              onTap: _loading ? null : _syncProfile,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _PanelAction(
+              icon: Icons.travel_explore,
+              label: 'Google',
+              tooltip: 'Voir aussi sur Google for Jobs',
+              onTap: _openGoogleJobs,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _PanelAction(
+              icon: Icons.event_available,
+              label: 'Salons',
+              tooltip: 'Salons & événements emploi',
+              onTap: () => showEventsSheet(context),
+            ),
+          ),
+        ]),
+        if (_history.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text('RECHERCHES RÉCENTES',
+              style: TextStyle(
+                  fontSize: 10, color: AppTheme.violetLight,
+                  fontWeight: FontWeight.w700, letterSpacing: 0.7)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ..._history.map((h) {
+              final p = h.split('|');
+              final label = [p[0], if (p.length > 1 && p[1].isNotEmpty) p[1]]
+                  .where((s) => s.isNotEmpty).join(' · ');
+              if (label.isEmpty) return const SizedBox.shrink();
+              return ActionChip(
+                label: Text(label, style: const TextStyle(fontSize: 12)),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                backgroundColor: AppTheme.glass(),
+                side: BorderSide(color: AppTheme.glassBorder()),
+                onPressed: () => _runHistory(h),
+              );
+            }),
+          ]),
+        ],
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // ---- one-line search bar: query + filters + live sync ----
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Offres pour vous',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            IconButton.filledTonal(
-              onPressed: _loading ? null : _searchAndSync,
-              icon: const Icon(Icons.refresh),
-              tooltip: 'Rafraîchir (chercher de nouvelles offres)',
-            ),
-          ]),
-        ),
-        // categories
-        SizedBox(
-          height: 36,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: _categories.entries
-                .map((e) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ActionChip(
-                        label: Text(e.key, style: const TextStyle(fontSize: 13)),
-                        backgroundColor: AppTheme.glass(),
-                        side: BorderSide(color: AppTheme.glassBorder()),
-                        onPressed: () => _runCategory(e.value),
-                      ),
-                    ))
-                .toList(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: TextField(
-            controller: _search,
-            onSubmitted: (_) => _runSearch(),
-            decoration: const InputDecoration(
-              hintText: 'Métier, techno (python, design, marketing...)',
-              prefixIcon: Icon(Icons.search),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: Row(children: [
             Expanded(
-              child: TextField(
-                controller: _location,
-                onSubmitted: (_) => _runSearch(),
-                decoration: const InputDecoration(
-                  hintText: 'Localisation (Paris, remote...)',
-                  prefixIcon: Icon(Icons.place_outlined),
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _search,
+                builder: (_, value, __) => TextField(
+                  controller: _search,
+                  onSubmitted: (_) => _runSearch(),
+                  textInputAction: TextInputAction.search,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Métier, techno, entreprise…',
+                    prefixIcon: const Icon(Icons.search, size: 19),
+                    prefixIconConstraints: const BoxConstraints(minWidth: 40),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                    suffixIcon: value.text.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.close, size: 17),
+                            splashRadius: 18,
+                            tooltip: 'Effacer',
+                            onPressed: () { _search.clear(); _load(); },
+                          ),
+                    suffixIconConstraints:
+                        const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            FilledButton.icon(
-              onPressed: _loading ? null : _searchAndSync,
-              icon: const Icon(Icons.sync, size: 18),
-              label: const Text('Synchroniser'),
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 56)),
+            const SizedBox(width: 8),
+            _IconAction(
+              icon: Icons.tune,
+              tooltip: 'Filtres & options',
+              selected: _filtersOpen,
+              badge: _activeFilters,
+              onTap: () => setState(() => _filtersOpen = !_filtersOpen),
+            ),
+            const SizedBox(width: 6),
+            _IconAction(
+              icon: Icons.sync,
+              tooltip: 'Chercher de nouvelles offres en ligne',
+              busy: _loading,
+              onTap: _loading ? null : _searchAndSync,
             ),
           ]),
         ),
-        const SizedBox(height: 10),
+        // ---- quick chips: the filters worth a single tap + categories ----
+        const SizedBox(height: 8),
         SizedBox(
-          height: 38,
+          height: 32,
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -328,32 +416,21 @@ class _JobsScreenState extends State<JobsScreen> {
                   _alternance ? _loadAlternance() : _load();
                 },
               ),
-              const _ChipGap(),
+              const SizedBox(width: 8),
               _FilterChip(
                 label: 'Favoris',
                 icon: Icons.favorite,
                 selected: _favoritesOnly,
                 onTap: () { setState(() => _favoritesOnly = !_favoritesOnly); _load(); },
               ),
-              const _ChipGap(),
+              const SizedBox(width: 8),
               _FilterChip(
                 label: 'Remote',
                 icon: Icons.wifi,
                 selected: _remote,
                 onTap: () { setState(() => _remote = !_remote); _load(); },
               ),
-              const _ChipGap(),
-              ...{
-                '': 'Tous', 'cdi': 'CDI', 'cdd': 'CDD', 'freelance': 'Freelance',
-                'stage': 'Stage',
-              }.entries.map((e) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _FilterChip(
-                      label: e.value,
-                      selected: _contract == e.key,
-                      onTap: () { setState(() => _contract = e.key); _load(); },
-                    ),
-                  )),
+              const SizedBox(width: 8),
               _FilterChip(
                 label: _sort == 'recent' ? 'Récent' : 'Pertinence',
                 icon: Icons.sort,
@@ -363,71 +440,60 @@ class _JobsScreenState extends State<JobsScreen> {
                   _load();
                 },
               ),
+              const _ChipGap(),
+              ..._categories.entries.map((e) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _FilterChip(
+                      label: e.key,
+                      selected: false,
+                      onTap: () => _runCategory(e.value),
+                    ),
+                  )),
             ],
           ),
         ),
+        // ---- collapsible: location, contract, secondary actions, history ----
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 180),
+          sizeCurve: Curves.easeOut,
+          crossFadeState:
+              _filtersOpen ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: _filtersPanel(),
+        ),
+        // ---- result count, so the list has context without a big title ----
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Column(children: [
-            FilledButton.icon(
-              onPressed: _loading ? null : _syncProfile,
-              icon: const Icon(Icons.auto_awesome, size: 18),
-              label: const Text('Trouver les offres pour mon CV'),
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+          child: Row(children: [
+            Text(
+              _loading
+                  ? 'Recherche…'
+                  : '${_jobs.length} offre${_jobs.length > 1 ? 's' : ''}'
+                      '${_sort == 'recent' ? ' · les plus récentes' : ' · par pertinence'}',
+              style: const TextStyle(
+                  fontSize: 11.5, color: AppTheme.muted2, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _openGoogleJobs,
-              icon: const Icon(Icons.travel_explore, size: 18),
-              label: const Text('Voir aussi sur Google'),
-              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-            ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: () => showEventsSheet(context),
-              icon: const Icon(Icons.event_available, size: 18),
-              label: const Text('Salons & événements emploi'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                backgroundColor: AppTheme.violet,
+            const Spacer(),
+            if (_activeFilters > 0 && !_filtersOpen)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _location.clear();
+                    _contract = '';
+                    _remote = false;
+                    _alternance = false;
+                    _favoritesOnly = false;
+                  });
+                  _load();
+                },
+                child: const Text('Réinitialiser les filtres',
+                    style: TextStyle(
+                        fontSize: 11.5, color: AppTheme.violetLight,
+                        fontWeight: FontWeight.w600)),
               ),
-            ),
           ]),
         ),
-        if (_history.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 32,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(right: 8),
-                  child: Center(
-                    child: Text('Récent :', style: TextStyle(color: AppTheme.muted2, fontSize: 12)),
-                  ),
-                ),
-                ..._history.map((h) {
-                  final p = h.split('|');
-                  final label = [p[0], if (p.length > 1 && p[1].isNotEmpty) p[1]]
-                      .where((s) => s.isNotEmpty).join(' · ');
-                  if (label.isEmpty) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      label: Text(label, style: const TextStyle(fontSize: 12)),
-                      backgroundColor: AppTheme.glass(),
-                      side: BorderSide(color: AppTheme.glassBorder()),
-                      onPressed: () => _runHistory(h),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Expanded(
           child: _loading
               ? const _JobsSkeleton()
@@ -520,6 +586,116 @@ class _FilterChip extends StatelessWidget {
                   color: selected ? Colors.white : AppTheme.muted,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
         ]),
+      ),
+    );
+  }
+}
+
+/// Square glass button sitting next to the search field (filters / sync).
+class _IconAction extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final bool selected;
+  final bool busy;
+  final int badge;
+  final VoidCallback? onTap;
+  const _IconAction({
+    required this.icon,
+    required this.tooltip,
+    this.selected = false,
+    this.busy = false,
+    this.badge = 0,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.violet.withValues(alpha: 0.28) : AppTheme.glass(0.06),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: selected ? AppTheme.violetLight : AppTheme.glassBorder()),
+          ),
+          child: Stack(alignment: Alignment.center, children: [
+            if (busy)
+              const SizedBox(
+                width: 18, height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.violetLight),
+              )
+            else
+              Icon(icon, size: 20, color: selected ? Colors.white : AppTheme.muted),
+            if (badge > 0 && !busy)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  width: 15,
+                  height: 15,
+                  decoration: const BoxDecoration(color: AppTheme.violet, shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: Text('$badge',
+                      style: const TextStyle(
+                          fontSize: 9.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact action button used inside the collapsible filters panel.
+class _PanelAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String tooltip;
+  final bool filled;
+  final VoidCallback? onTap;
+  const _PanelAction({
+    required this.icon,
+    required this.label,
+    required this.tooltip,
+    this.filled = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onTap == null;
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: filled ? AppTheme.violet.withValues(alpha: disabled ? 0.25 : 0.9) : AppTheme.glass(0.06),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: filled ? Colors.transparent : AppTheme.glassBorder()),
+          ),
+          alignment: Alignment.center,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 15, color: filled ? Colors.white : AppTheme.violetLight),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: filled ? Colors.white : AppTheme.violetLight)),
+            ),
+          ]),
+        ),
       ),
     );
   }
