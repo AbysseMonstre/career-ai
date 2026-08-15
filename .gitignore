@@ -36,3 +36,6 @@ mobile/windows/flutter/ephemeral/
 
 # ---- misc ----
 .DS_Store
+
+# one-off local verification scripts (may reference local paths)
+backend/scratchpad/
