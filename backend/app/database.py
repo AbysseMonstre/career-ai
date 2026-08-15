@@ -161,6 +161,7 @@ _MIGRATIONS = [
     ("users", "alerts_enabled", "ALTER TABLE users ADD COLUMN alerts_enabled INTEGER DEFAULT 0"),
     ("users", "alerts_sent_at", "ALTER TABLE users ADD COLUMN alerts_sent_at TEXT DEFAULT ''"),
     ("jobs", "search_text", "ALTER TABLE jobs ADD COLUMN search_text TEXT DEFAULT ''"),
+    ("profiles", "cv_structure", "ALTER TABLE profiles ADD COLUMN cv_structure TEXT DEFAULT '{}'"),
 ]
 
 # ---------------------------------------------------------------------------

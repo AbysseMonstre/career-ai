@@ -1,9 +1,15 @@
 """Match score between a candidate profile and a job (0-100).
 
 Weighted blend of:
-  - skill overlap (recall of job skills covered by the candidate)  -> 60%
-  - title/keyword similarity                                       -> 25%
-  - location compatibility (remote-friendly)                       -> 15%
+  - skill overlap (recall of job skills covered by the candidate)  -> 44%
+  - semantic similarity between CV text and the ad                 -> 22%
+  - seniority fit (years required vs years held)                   -> 14%
+  - title/keyword similarity                                       -> 12%
+  - location compatibility (remote-friendly)                       -> 8%
+
+Semantic and seniority only apply when the data exists (a CV with text, an ad
+that states a requirement); their weight is otherwise handed to skills, so an
+under-informed match is never inflated by a neutral default.
 
 Returns an int score plus the matched/missing skills so the UI can show stats.
 """
@@ -69,6 +75,57 @@ def _job_skills(job: dict) -> set:
     return skills
 
 
+# --- seniority ------------------------------------------------------------
+# "3 ans d'expérience", "5+ years experience", "minimum 2 ans", "3 à 5 ans"
+_EXP_PATTERNS = [
+    re.compile(r"(\d{1,2})\s*(?:\+|ans?|années?)\s*(?:minimum\s+)?(?:d[e'’]\s*)?exp[ée]rience", re.I),
+    re.compile(r"exp[ée]rience\s*(?:professionnelle\s*)?(?:de|d[e'’]|:)?\s*(\d{1,2})\s*ans?", re.I),
+    re.compile(r"(?:minimum|au moins|mini\.?)\s*(\d{1,2})\s*ans?", re.I),
+    re.compile(r"(\d{1,2})\s*\+?\s*years?(?:\s+of)?\s+experience", re.I),
+    re.compile(r"(?:minimum|at least)\s*(\d{1,2})\s*years?", re.I),
+]
+# "3 à 5 ans", "3-5 years" — the lower bound is the one that gates applications.
+_EXP_RANGE = re.compile(
+    r"(\d{1,2})\s*(?:à|a|-|–|—|to)\s*\d{1,2}\s*\+?\s*(?:ans?|années?|years?)", re.I)
+# Fallbacks when the ad states a level instead of a number of years.
+_JUNIOR_TERMS = ("junior", "débutant", "debutant", "entry level", "entry-level",
+                 "graduate", "stage", "stagiaire", "alternance", "alternant",
+                 "apprenti", "apprentissage", "first experience", "première expérience")
+_SENIOR_TERMS = ("senior", "confirmé", "confirme", "expérimenté", "experimente",
+                 "lead ", "principal", "head of", "expert", "8 ans", "10 ans")
+
+
+def required_experience_months(text: str):
+    """Months of experience an ad asks for, or None when it does not say."""
+    if not text:
+        return None
+    years = [int(m.group(1)) for p in (*_EXP_PATTERNS, _EXP_RANGE)
+             for m in p.finditer(text) if 0 < int(m.group(1)) <= 20]
+    if years:
+        return min(years) * 12  # "3 à 5 ans" -> the floor is what gates you
+    low = text.lower()
+    if any(t in low for t in _JUNIOR_TERMS):
+        return 0
+    if any(t in low for t in _SENIOR_TERMS):
+        return 60
+    return None
+
+
+def seniority_fit(candidate_months: int, required_months: int) -> float:
+    """1.0 when the candidate clears the bar, degrading as the gap widens."""
+    if required_months <= 0:
+        return 1.0
+    ratio = candidate_months / required_months
+    if ratio >= 1.0:
+        # far above the ask is its own kind of mismatch, but a mild one
+        return 0.85 if candidate_months > required_months + 96 else 1.0
+    if ratio >= 0.7:
+        return 0.85
+    if ratio >= 0.4:
+        return 0.6
+    return 0.3
+
+
 def score(profile: dict, job: dict) -> dict:
     cand_skills = {s.lower() for s in profile.get("skills", [])}
     job_skills = _job_skills(job)
@@ -108,13 +165,28 @@ def score(profile: dict, job: dict) -> dict:
     else:
         loc_score = 0.4
 
-    # weights (redistribute the semantic weight onto skills when absent)
-    w_skill = 0.50 + (0.25 - sem_w)
-    total = w_skill * skill_score + sem_w * sem_score + 0.15 * title_score + 0.10 * loc_score
+    # 5) seniority: only scored when the ad states a level and we know the
+    #    candidate's track record (rebuilt from their CV by cv_structure).
+    cand_months = int(profile.get("experience_months") or 0)
+    req_months = required_experience_months(job_text)
+    if req_months is not None and cand_months > 0:
+        sen_score = seniority_fit(cand_months, req_months)
+        sen_w = 0.14
+    else:
+        sen_score = 0.0
+        sen_w = 0.0
+
+    # weights (unused semantic/seniority weight is handed back to skills)
+    w_skill = 0.44 + (0.22 - sem_w) + (0.14 - sen_w)
+    total = (w_skill * skill_score + sem_w * sem_score + sen_w * sen_score
+             + 0.12 * title_score + 0.08 * loc_score)
     return {
         "score": round(min(total, 1.0) * 100),
         "matched_skills": sorted(matched),
         "missing_skills": sorted(job_skills - cand_skills)[:8],
         "job_skill_count": len(job_skills),
         "semantic": round(sem_score * 100),
+        "required_experience_months": req_months,
+        "candidate_experience_months": cand_months,
+        "seniority": round(sen_score * 100) if sen_w else None,
     }

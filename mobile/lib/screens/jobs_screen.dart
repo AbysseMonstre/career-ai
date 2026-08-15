@@ -958,6 +958,20 @@ class _JobCard extends StatelessWidget {
                                       style: const TextStyle(color: AppTheme.muted, height: 1.4)),
                                 ),
                               ]),
+                              if (m.seniorityLabel != null) ...[
+                                const SizedBox(height: 12),
+                                Row(children: [
+                                  Icon(Icons.timeline,
+                                      size: 14,
+                                      color: AppTheme.scoreColor(m.seniority ?? 0)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text('Expérience — ${m.seniorityLabel}',
+                                        style: const TextStyle(
+                                            fontSize: 12, color: AppTheme.muted)),
+                                  ),
+                                ]),
+                              ],
                               if (m.matchedSkills.isNotEmpty) ...[
                                 const SizedBox(height: 14),
                                 SkillChips(skills: m.matchedSkills, highlight: m.matchedSkills),

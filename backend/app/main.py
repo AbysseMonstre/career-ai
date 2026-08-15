@@ -21,7 +21,8 @@ from starlette.responses import Response
 from pydantic import BaseModel
 
 from .database import get_conn, init_db
-from . import security, cv_parser, matching, notifications, config, cover_letter, expansion, ai
+from . import (security, cv_parser, cv_structure, matching, notifications, config,
+               cover_letter, expansion, ai)
 from .scrapers import scrape_all
 from .scrapers.aggregator import _is_junk, _is_formation_ad
 
@@ -57,7 +58,18 @@ def _unaccent(s: str) -> str:
 
 
 def _client_key(request: Request, suffix: str) -> str:
-    ip = request.client.host if request.client else "?"
+    """Rate-limit bucket for this caller.
+
+    Behind a hosting proxy (Render) the socket peer is the proxy itself, so
+    `request.client.host` is identical for every visitor on earth and the
+    limiter degrades into a single shared quota. X-Forwarded-For carries the
+    chain instead — and we read its **last** hop, the one the proxy appends
+    itself, because the earlier entries are attacker-controlled.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",")[-1].strip() if forwarded else ""
+    if not ip:
+        ip = request.client.host if request.client else "?"
     return f"{ip}:{suffix}"
 
 
@@ -153,9 +165,16 @@ class PlacementRequestIn(BaseModel):
 def _profile(conn, uid):
     row = conn.execute("SELECT * FROM profiles WHERE user_id=?", (uid,)).fetchone()
     if not row:
-        return {"user_id": uid, "title": "", "location": "", "cv_text": "", "skills": []}
+        return {"user_id": uid, "title": "", "location": "", "cv_text": "",
+                "skills": [], "structure": {}}
     d = dict(row)
     d["skills"] = json.loads(d.get("skills") or "[]")
+    try:
+        d["structure"] = json.loads(d.pop("cv_structure", None) or "{}")
+    except (ValueError, TypeError):
+        d["structure"] = {}
+    # Flattened for matching.score, which weighs seniority against the ad.
+    d["experience_months"] = d["structure"].get("total_experience_months", 0)
     return d
 
 
@@ -424,23 +443,31 @@ async def upload_cv(
 ):
     if file is not None:
         content = await file.read()
-        raw = cv_parser.extract_text(file.filename, content)
+        try:
+            raw = cv_parser.extract_text(file.filename, content)
+        except cv_parser.CvExtractionError as exc:
+            # Explicit failure: never store an empty CV behind a 200 response.
+            raise HTTPException(422, str(exc))
     elif text:
         raw = text
     else:
-        raise HTTPException(400, "Provide a file or text")
+        raise HTTPException(400, "Fournissez un fichier ou du texte")
+
+    if not raw.strip():
+        raise HTTPException(422, "Aucun texte exploitable n'a pu être lu.")
 
     skills = cv_parser.extract_skills(raw)
     guessed_title = title or cv_parser.guess_title(raw)
+    structure = cv_structure.parse_structure(raw)
     with get_conn() as conn:
         conn.execute(
             """UPDATE profiles SET cv_text=?, skills=?, title=?, location=?,
-                   updated_at=CURRENT_TIMESTAMP WHERE user_id=?""",
+                   cv_structure=?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?""",
             (raw[:20000], json.dumps(skills), guessed_title or "",
-             location or "", user["id"]),
+             location or "", json.dumps(structure, ensure_ascii=False), user["id"]),
         )
     return {"skills": skills, "title": guessed_title, "location": location or "",
-            "chars": len(raw)}
+            "chars": len(raw), "structure": structure}
 
 
 @app.get("/cv")

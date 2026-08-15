@@ -77,24 +77,56 @@ SKILL_ALIASES = {
 _WORD = re.compile(r"[a-zA-ZÀ-ÿ0-9+#.]+")
 
 
+class CvExtractionError(Exception):
+    """The file could not be turned into text — the caller should say why."""
+
+
 def extract_text(filename: str, content: bytes) -> str:
     name = (filename or "").lower()
+    if not content:
+        raise CvExtractionError("Le fichier est vide.")
     if name.endswith(".pdf"):
         return _pdf_text(content)
+    if name.endswith((".doc", ".docx")):
+        raise CvExtractionError(
+            "Les fichiers Word ne sont pas encore pris en charge. "
+            "Exportez votre CV en PDF, ou collez son texte ci-dessous.")
     # treat everything else as utf-8 text
     try:
         return content.decode("utf-8", errors="ignore")
     except Exception:
-        return ""
+        raise CvExtractionError("Fichier illisible : utilisez un PDF ou du texte brut.")
 
 
 def _pdf_text(content: bytes) -> str:
+    """Text layer of a PDF. Raises CvExtractionError with an actionable reason.
+
+    A scanned CV (photo/image export) has no text layer: pypdf returns empty
+    strings rather than failing, so we detect it here instead of silently
+    storing an empty CV.
+    """
     try:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(content))
-        return "\n".join((page.extract_text() or "") for page in reader.pages)
-    except Exception:
-        return ""
+    except Exception as exc:
+        raise CvExtractionError(
+            "PDF illisible ou endommagé — réexportez-le puis réessayez.") from exc
+    if getattr(reader, "is_encrypted", False):
+        try:
+            reader.decrypt("")  # many CVs are "protected" with an empty password
+        except Exception:
+            raise CvExtractionError(
+                "Ce PDF est protégé par mot de passe — retirez la protection puis réessayez.")
+    try:
+        text = "\n".join((page.extract_text() or "") for page in reader.pages)
+    except Exception as exc:
+        raise CvExtractionError(
+            "Impossible de lire le texte de ce PDF — réexportez-le puis réessayez.") from exc
+    if not text.strip():
+        raise CvExtractionError(
+            "Ce PDF ne contient aucun texte : c'est une image (CV scanné ou exporté en image). "
+            "Réexportez-le depuis Word/Canva en PDF texte, ou collez le contenu ci-dessous.")
+    return text
 
 
 def extract_skills(text: str) -> list:

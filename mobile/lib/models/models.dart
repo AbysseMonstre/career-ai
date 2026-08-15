@@ -25,11 +25,20 @@ class MatchStats {
   final List<String> missingSkills;
   final int jobSkillCount;
 
+  /// Null when the ad states no experience requirement — the score then
+  /// ignores seniority entirely rather than guessing.
+  final int? seniority;
+  final int? requiredExperienceMonths;
+  final int candidateExperienceMonths;
+
   MatchStats({
     required this.score,
     required this.matchedSkills,
     required this.missingSkills,
     required this.jobSkillCount,
+    this.seniority,
+    this.requiredExperienceMonths,
+    this.candidateExperienceMonths = 0,
   });
 
   factory MatchStats.fromJson(Map<String, dynamic> j) => MatchStats(
@@ -37,7 +46,26 @@ class MatchStats {
         matchedSkills: List<String>.from(j['matched_skills'] ?? []),
         missingSkills: List<String>.from(j['missing_skills'] ?? []),
         jobSkillCount: j['job_skill_count'] ?? 0,
+        seniority: j['seniority'],
+        requiredExperienceMonths: j['required_experience_months'],
+        candidateExperienceMonths: j['candidate_experience_months'] ?? 0,
       );
+
+  static String _months(int m) {
+    if (m <= 0) return 'aucune';
+    if (m < 12) return '$m mois';
+    final y = m ~/ 12, rest = m % 12;
+    final label = y > 1 ? '$y ans' : '1 an';
+    return rest == 0 ? label : '$label $rest mois';
+  }
+
+  /// "Demandé : 3 ans · vous : 1 an 5 mois" — null when the ad is silent.
+  String? get seniorityLabel {
+    final req = requiredExperienceMonths;
+    if (req == null) return null;
+    final asked = req == 0 ? 'ouvert aux débutants' : 'demandé : ${_months(req)}';
+    return '$asked · vous : ${_months(candidateExperienceMonths)}';
+  }
 }
 
 class Job {
@@ -225,6 +253,96 @@ class Achievement {
         id: j['id'] ?? '', label: j['label'] ?? '', emoji: j['emoji'] ?? '🏅',
         done: j['done'] == true,
       );
+}
+
+/// One job held by the candidate, as rebuilt from their CV.
+class CvExperience {
+  final String period, role, company, location, context;
+  final int? durationMonths;
+  final bool ongoing;
+  final List<String> bullets;
+  CvExperience({
+    this.period = '', this.role = '', this.company = '', this.location = '',
+    this.context = '', this.durationMonths, this.ongoing = false,
+    this.bullets = const [],
+  });
+  factory CvExperience.fromJson(Map<String, dynamic> j) => CvExperience(
+        period: j['period'] ?? '', role: j['role'] ?? '',
+        company: j['company'] ?? '', location: j['location'] ?? '',
+        context: j['context'] ?? '',
+        durationMonths: j['duration_months'],
+        ongoing: j['ongoing'] == true,
+        bullets: List<String>.from(j['bullets'] ?? const []),
+      );
+
+  /// "6 mois", "1 an 5 mois" — empty when the CV gave no usable dates.
+  String get durationLabel {
+    final m = durationMonths;
+    if (m == null || m <= 0) return '';
+    if (m < 12) return '$m mois';
+    final years = m ~/ 12, rest = m % 12;
+    final y = years > 1 ? '$years ans' : '1 an';
+    return rest == 0 ? y : '$y $rest mois';
+  }
+}
+
+/// A dated line from the CV (diploma, certification).
+class CvEntry {
+  final String period, label;
+  CvEntry({this.period = '', this.label = ''});
+  factory CvEntry.fromJson(Map<String, dynamic> j) =>
+      CvEntry(period: j['period'] ?? '', label: j['label'] ?? '');
+}
+
+/// A competency written by the candidate: "<label> : <detail>".
+class CvSkill {
+  final String label, detail;
+  CvSkill({this.label = '', this.detail = ''});
+  factory CvSkill.fromJson(Map<String, dynamic> j) =>
+      CvSkill(label: j['label'] ?? '', detail: j['detail'] ?? '');
+}
+
+/// The CV rebuilt as sections. Any list may be empty when the PDF had no
+/// recognisable section of that kind.
+class CvStructure {
+  final List<CvExperience> experiences;
+  final List<CvEntry> education, certifications;
+  final List<CvSkill> declaredSkills;
+  final List<String> languages, sectionsFound;
+  final int totalExperienceMonths;
+  CvStructure({
+    this.experiences = const [], this.education = const [],
+    this.certifications = const [], this.declaredSkills = const [],
+    this.languages = const [], this.sectionsFound = const [],
+    this.totalExperienceMonths = 0,
+  });
+
+  bool get isEmpty =>
+      experiences.isEmpty && education.isEmpty &&
+      certifications.isEmpty && declaredSkills.isEmpty && languages.isEmpty;
+
+  static List<T> _list<T>(dynamic v, T Function(Map<String, dynamic>) f) =>
+      ((v ?? const []) as List).map((e) => f(Map<String, dynamic>.from(e))).toList();
+
+  factory CvStructure.fromJson(Map<String, dynamic> j) => CvStructure(
+        experiences: _list(j['experiences'], CvExperience.fromJson),
+        education: _list(j['education'], CvEntry.fromJson),
+        certifications: _list(j['certifications'], CvEntry.fromJson),
+        declaredSkills: _list(j['declared_skills'], CvSkill.fromJson),
+        languages: List<String>.from(j['languages'] ?? const []),
+        sectionsFound: List<String>.from(j['sections_found'] ?? const []),
+        totalExperienceMonths: j['total_experience_months'] ?? 0,
+      );
+
+  /// "1 an 5 mois d'expérience" for the summary header.
+  String get totalLabel {
+    final m = totalExperienceMonths;
+    if (m <= 0) return '';
+    if (m < 12) return "$m mois d'expérience";
+    final years = m ~/ 12, rest = m % 12;
+    final y = years > 1 ? '$years ans' : '1 an';
+    return rest == 0 ? "$y d'expérience" : "$y $rest mois d'expérience";
+  }
 }
 
 class Mission {

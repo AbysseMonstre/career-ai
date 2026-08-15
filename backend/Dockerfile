@@ -18,4 +18,6 @@ EXPOSE 8077
 RUN useradd -m appuser && mkdir -p /data && chown appuser /data
 USER appuser
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# --proxy-headers: the host terminates TLS, so without it every request looks
+# like plain HTTP coming from the proxy's own address.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]

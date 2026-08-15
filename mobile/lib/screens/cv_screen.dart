@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/app_state.dart';
+import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import 'cv_profile_screen.dart';
 
 class CvScreen extends StatefulWidget {
   const CvScreen({super.key});
@@ -36,27 +38,77 @@ class _CvScreenState extends State<CvScreen> {
   }
 
   Future<void> _pickFile() async {
-    final res = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'txt', 'md'],
-      withData: true,
-    );
-    if (res == null || res.files.single.bytes == null) return;
+    // Captured before the picker's async gap so we never read a stale context.
+    final api = context.read<AppState>().api;
+    FilePickerResult? res;
+    try {
+      res = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'txt', 'md'],
+        withData: true,
+      );
+    } catch (e) {
+      if (mounted) showError(context, "Impossible d'ouvrir le sélecteur de fichiers : $e");
+      return;
+    }
+    if (res == null) return; // user cancelled — not an error
+    final f = res.files.single;
+    // Without bytes there is nothing to send; say so instead of failing silently.
+    if (f.bytes == null) {
+      if (mounted) {
+        showError(context,
+            "Le fichier « ${f.name} » n'a pas pu être lu. Réessayez, ou collez le texte de votre CV ci-dessous.");
+      }
+      return;
+    }
     setState(() => _busy = true);
     try {
-      final f = res.files.single;
-      final out = await context.read<AppState>().api.uploadCvFile(
+      final out = await api.uploadCvFile(
             f.bytes!, f.name,
             title: _title.text.trim().isEmpty ? null : _title.text.trim(),
             location: _location.text.trim().isEmpty ? null : _location.text.trim(),
           );
-      setState(() => _skills = List<String>.from(out['skills'] ?? []));
-      if (mounted) showOk(context, '${_skills.length} compétences extraites de « ${f.name} »');
+      final skills = List<String>.from(out['skills'] ?? []);
+      setState(() {
+        _skills = skills;
+        if ((out['title'] ?? '').toString().isNotEmpty && _title.text.trim().isEmpty) {
+          _title.text = out['title'];
+        }
+      });
+      if (!mounted) return;
+      // Show the rebuilt profile straight away — that is the point of importing.
+      final structure = CvStructure.fromJson(
+          Map<String, dynamic>.from(out['structure'] ?? const {}));
+      if (!structure.isEmpty) {
+        _openProfile(structure);
+        showOk(context,
+            'CV lu : ${structure.experiences.length} expériences, '
+            '${structure.declaredSkills.length} compétences');
+        return;
+      }
+      if (skills.isEmpty) {
+        // The CV was read (chars > 0) but matched no known skill — that is a
+        // vocabulary gap, not a success worth a green tick.
+        showError(context,
+            "« ${f.name} » a bien été lu (${out['chars']} caractères) mais aucune compétence connue n'a été reconnue. Complétez le texte ci-dessous.");
+      } else {
+        showOk(context, '${skills.length} compétences extraites de « ${f.name} »');
+      }
     } catch (e) {
       if (mounted) showError(context, e);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _openProfile([CvStructure? structure]) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => CvProfileScreen(
+        initial: structure,
+        title: _title.text.trim(),
+        matchedSkills: _skills,
+      ),
+    ));
   }
 
   Future<void> _submitText() async {
@@ -111,6 +163,12 @@ class _CvScreenState extends State<CvScreen> {
         ),
         const SizedBox(height: 12),
         FilledButton.icon(onPressed: _busy ? null : _submitText, icon: const Icon(Icons.psychology), label: const Text('Analyser mon CV')),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => _openProfile(),
+          icon: const Icon(Icons.badge_outlined, size: 18),
+          label: const Text('Voir mon profil (compétences & expériences)'),
+        ),
         const SizedBox(height: 24),
         if (_busy) const Center(child: CircularProgressIndicator()),
         if (_skills.isNotEmpty) ...[
